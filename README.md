@@ -1,35 +1,30 @@
 # Alter
 
-Build a digital persona of yourself, your alter ego, that chats and drafts the way you would, and gets better every time you use it.
+Build a digital persona of yourself — your alter ego — that chats and drafts the way you would, and gets better every time you use it.
 
-Runs entirely on your machine. Your recordings, answers, documents, and the persona itself stay in local Postgres and on your disk. The only network calls go to a model API you choose, and a fully local mode needs none.
+Runs entirely on your machine. Your recordings, answers, documents, and the persona itself stay in local Postgres and on your disk. The only network calls go to the model API you choose, and a fully local mode needs none.
 
 ## How it works
 
-The conversation is the interface. You talk to Alter in your own client, such as Telegram, and once the persona is live everything — chatting, correcting, uploading, status — happens there. (The interview itself currently runs in a bundled local web page; asking the questions directly in chat is the contracted design and is landing next.)
+The conversation is the interface. You talk to Alter in your own client, such as Telegram — chatting, correcting, uploading, status: all of it in-chat.
 
-1. **Interview.** Alter asks the personality questions one at a time. You answer by voice memo or text, and it transcribes voice locally. Ask for a status anytime and it replies with the per-module progress meter and what's pending.
-2. **Base persona at the threshold.** Once you've banked enough spoken minutes and answered the core questions, one command builds the base persona and switches it on (automatic build at the threshold is landing next). You keep answering whenever you like — each answer deepens the persona rather than restarting it, and if you already have recordings, `bootstrap` activates a persona from them with no interview at all.
-3. **Enrich.** Add writing samples, documents, and exported AI chats from OpenAI or Claude. Alter keeps only your words, strips other people's text, and redacts secrets before storing.
-4. **Use.** Chat to it as a thinking partner, or hand it tasks like drafting an email in your voice.
-5. **Improve, forever.** Correct a reply and it changes on the next turn, then keeps the fix. Drop in new material and it absorbs it. When new facts clash with old ones it asks instead of overwriting: "you just said introvert, but earlier you described drawing energy from people, situational, changed, or wrong?" It keeps the richer answer, flags gaps in what it knows, and tracks its own fidelity so drift stays visible.
+1. **Interview in chat.** Alter asks its questions one at a time — identity, how you communicate, your work, your interests. Answer by voice memo or text; voice transcribes locally. Say "status" anytime for the per-module meter and what's pending. Already have recordings? `bootstrap` builds the persona from them with no interview at all.
+2. **Base persona at the threshold.** Bank 30 spoken minutes and the core answers, and Alter builds the base persona and switches it on. Keep answering whenever you like — every answer deepens it, nothing restarts it.
+3. **Enrich.** Drop in writing samples, documents, and exported AI chats from OpenAI or Claude. Alter keeps only your words, strips everyone else's, redacts secrets before storing, and reports back what each upload actually taught it.
+4. **Use.** A thinking partner that answers like you, with live tools — web search, page fetch, your platform's skills — and a drafter for messages and emails in your voice.
+5. **Improve, forever.** Correct a reply and it changes on the very next turn, then keeps the fix. When new facts clash with old ones it asks instead of overwriting: "you just said introvert, but earlier you described drawing energy from people — situational, changed, or wrong?" The richer answer wins. Conversation memory fades in hours; say "remember this:" and it's permanent. Eight sealed questions never enter its memory, so it can always be tested against the real you.
 
 ## Voice
 
-Replies are text by default. Turn on voice and Alter speaks back in your client:
+Text by default. Turn voice on and Alter speaks in your cloned voice, built from the memos you already recorded — or ask it to read anything aloud, on demand.
 
-- **ElevenLabs.** Highest quality today, using your own ElevenLabs key and a clone built from the voice memos you already recorded during the interview. Your key, your account, never ours.
-- **Custom local voice.** Runs on your machine, no key, no cloud — experimental. Current local clones are honestly not yet at parity (they lose a blind listening test against a professional clone), so this ships as an option, not the default.
+- **ElevenLabs.** Highest quality, your own key and your own clone. Your key, your account, never ours.
+- **Local.** No key, no cloud — a step below clone parity today, and honest about it.
 
-Voice replies synthesize after the text reply is already sent, so they never slow the conversation, and any synthesis failure degrades silently to text. You can also ask Alter to read anything out loud in your voice on demand.
-
-## Status
-
-Live today: the interview (local web page) with bootstrap from existing recordings, persona synthesis, enrichment from documents and OpenAI/Claude exports, the full improvement loop (corrections, contradiction clarifications, short-term session memory with a permanent "remember this:" escape), live tools (web search, page fetch, platform skills), and voice output via ElevenLabs — including on-demand "read this in my voice."
-
-Landing next: the fully in-chat interview, automatic persona build at the threshold, and a local no-key voice at parity.
+Voice synthesizes after the text reply has already sent, so it never slows the conversation, and any failure degrades silently to text.
 
 ## Setup
+
 
 ### 1. Postgres
 
@@ -50,24 +45,19 @@ cp .env.example .env
 
 ### 3. Database + questions
 
-Place **`voice-personality-intake.md`** in the project root — the seed parses
-the numbered open-ended questions in sections A–H and the validation items
-V1–V8 from it. Then:
-
 ```bash
 npm install
 npx prisma migrate dev
 npm run db:seed
 ```
 
-The seed also loads the 20-item **Mini-IPIP** (Donnellan et al., 2006; public
-domain, from the International Personality Item Pool) as the Likert set for
-the trial, with the published domain/reverse-scoring key. OCEAN items are
-interleaved in small batches between the voice sections; the validation set is
-sealed at the very end. Swapping in the full 120-item IPIP-NEO later is a
-seed-only change: replace the `LIKERT_ITEMS` array in `prisma/seed.ts`
-(text, domain, facet, reverse per item) and re-run the seed — no app code
-changes.
+The seed builds the four-module curriculum from `src/curriculum/curriculum.ts`
+— Identity & values, Communication situations, Work & craft, Interests &
+passions — with the 20-item **Mini-IPIP** (Donnellan et al., 2006; public
+domain, ipip.ori.org) interleaved and the eight sealed validation questions
+last. (`voice-personality-intake.md` is generated documentation, not an
+input.) Swapping in the 120-item IPIP-NEO later is a seed-only change:
+replace `LIKERT_ITEMS` in `prisma/seed.ts` and re-run.
 
 ### 4. whisper.cpp (default transcriber)
 
