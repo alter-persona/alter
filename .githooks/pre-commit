@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Alter release guard: no recorded media, no non-sample packs content, no
+# secret-shaped strings enter history. Bypassing requires --no-verify, which
+# is a deliberate act you'll have to explain to yourself.
+set -euo pipefail
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$STAGED" ] && exit 0
+FAIL=0
+
+# 1. Media files are personal data no matter where they sit.
+if hits=$(echo "$STAGED" | grep -iE '\.(wav|webm|mp3|m4a|ogg|oga|flac)$'); then
+  echo "✖ pre-commit: audio/media files staged:"; echo "$hits" | sed 's/^/    /'; FAIL=1
+fi
+
+# 2. packs/ may only carry the synthetic sample.
+if hits=$(echo "$STAGED" | grep -E '^packs/' | grep -vE '^packs/sample/'); then
+  echo "✖ pre-commit: packs/ content outside packs/sample/:"; echo "$hits" | sed 's/^/    /'; FAIL=1
+fi
+
+# 3. Secret-shaped content in staged text (fixture keys in tests/redaction rules
+#    are allowlisted by path).
+ALLOW='^(tests/corpus/processing\.test\.ts|src/corpus/redact\.ts)$'
+while IFS= read -r f; do
+  echo "$f" | grep -qE "$ALLOW" && continue
+  git show ":$f" 2>/dev/null | grep -qE 'sk-ant-[A-Za-z0-9_-]{10,}|sk_live_[A-Za-z0-9]{10,}|xkeysib-[A-Za-z0-9]{10,}|whsec_[A-Za-z0-9]{10,}|AKIA[A-Z0-9]{16}|xox[bp]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY|[0-9]{8,10}:AA[A-Za-z0-9_-]{30}' \
+    && { echo "✖ pre-commit: secret-shaped string in $f"; FAIL=1; }
+done <<< "$STAGED"
+
+[ "$FAIL" -eq 0 ] || { echo "pre-commit: blocked. Fix or consciously --no-verify."; exit 1; }
+exit 0

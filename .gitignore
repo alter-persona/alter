@@ -1,0 +1,57 @@
+# ── Build / deps ─────────────────────────────────────────────
+node_modules/
+.next/
+/dist/
+*.tsbuildinfo
+next-env.d.ts
+.venv*/
+
+# ── Secrets & local config (never tracked) ───────────────────
+.env
+.env.*
+!.env.example
+/pack/scan-patterns.local.txt
+
+# ── Personal data: interview, corpus, memory, evaluation ─────
+/data/
+/storage/
+/corpus/
+/holdout/
+/sources/
+/eval/
+/backups/
+/logs/
+/packs/
+!/packs/sample/
+
+# ── Voice: recordings, datasets, models (personal audio) ─────
+/voice/
+/voice-dataset/
+/voice-train/
+/voice-train-local/
+/voice-ab/
+/models/
+/scripts/
+
+# ── Legacy v1 persona builder (pre-factory, not shipped) ─────
+/src/corpus/persona/
+/src/skill/
+
+# ── Media files anywhere — a voice clip is personal data ─────
+*.wav
+*.webm
+*.mp3
+*.m4a
+*.ogg
+*.oga
+*.flac
+*.zip
+
+# ── Owner working docs (sanitized versions ship at release) ──
+/CLAUDE.md
+/docs/
+!/docs/push-audit.md
+/VERSIONS
+
+# ── OS noise ─────────────────────────────────────────────────
+.DS_Store

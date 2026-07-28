@@ -1,0 +1,19 @@
+name: understudy
+version: 1
+generalisable: true
+created_by_agent: false
+mode: llm
+description: |
+  Understudy — a skill that studies you until it can stand in for you.
+  Interviews the user conversationally (voice memos preferred), ingests their
+  documents and AI chat exports, and synthesizes a digital persona that
+  answers and drafts the way they would. Requires the companion local
+  services (see bin/install.sh; verify with bin/health.sh). Behavior
+  contract in SKILL.md.
+llm:
+  model: ollama/local-small
+  temperature: 0.8
+  max_tokens: 900
+inputs:
+  message: The user's message (question, answer, correction, or command).
+  history: Optional prior turns for continuity.

@@ -1,0 +1,32 @@
+{
+  "improvementModel": {
+    "mode": "frontier",
+    "frontier": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5"
+    },
+    "local": {
+      "provider": "openai_compatible",
+      "url": "http://127.0.0.1:11434/v1",
+      "model": "local-large:latest"
+    }
+  },
+  "classifierModel": {
+    "provider": "openai_compatible",
+    "url": "http://127.0.0.1:11434/v1",
+    "model": "local-small:latest"
+  },
+  "hotNoteCap": 10,
+  "gapSimilarityThreshold": 0.62,
+  "gapWeakCountForInvite": 3,
+  "reconAutoConfidence": 0.75,
+  "neighborCheckDistance": 0.45,
+  "spotCheckEveryEvents": 50,
+  "resynthesisChunkThreshold": 40,
+  "resynthesisCorrectionThreshold": 15,
+  "maxClarificationsPerConversation": 1,
+  "maxInvitationsPerConversation": 1,
+  "longMemoMaterialSeconds": 90,
+  "sessionRetentionHours": 12,
+  "sessionMaxTurns": 30
+}

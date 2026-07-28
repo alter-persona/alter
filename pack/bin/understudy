@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Understudy CLI wrapper: bootstrap | status | rebuild | export | health |
+# about | delete-everything
+set -euo pipefail
+cd "$(dirname "$0")/../services"
+exec npx tsx src/understudy/cli.ts "$@"

@@ -1,0 +1,19 @@
+name: vibepersonality
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: vibepersonality-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: intake
+      POSTGRES_PASSWORD: intake
+      POSTGRES_DB: intake
+    ports:
+      # 5433 on the host to avoid colliding with any existing local Postgres on 5432.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+volumes:
+  pg_data:

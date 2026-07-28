@@ -1,0 +1,58 @@
+{
+  "name": "vibepersonality",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset",
+    "corpus": "tsx src/corpus/cli.ts",
+    "persona": "tsx src/corpus/persona/build.ts",
+    "skill": "tsx src/skill/cli.ts",
+    "persona2": "tsx src/persona2/cli.ts",
+    "test:persona2": "EMBED_FAKE=1 tsx --test tests/persona2/*.test.ts",
+    "ingest:backfill": "tsx src/skill/backfill.ts",
+    "test:corpus": "tsx --test tests/corpus/*.test.ts",
+    "test:ingest": "EMBED_FAKE=1 tsx --test tests/ingest/*.test.ts",
+    "voice": "tsx src/voice/cli.ts",
+    "test:voice": "EMBED_FAKE=1 tsx --test tests/voice/*.test.ts",
+    "loop": "tsx src/loop/cli.ts",
+    "loop:telegram": "tsx src/loop/adapters/telegram.ts",
+    "test:loop": "tsx --test tests/loop/*.test.ts",
+    "curriculum": "tsx src/curriculum/cli.ts",
+    "understudy": "tsx src/understudy/cli.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "@prisma/client": "^6.7.0",
+    "adm-zip": "^0.6.0",
+    "archiver": "^7.0.1",
+    "gpt-tokenizer": "^3.4.0",
+    "js-yaml": "^5.2.2",
+    "mailparser": "^3.9.14",
+    "mammoth": "^1.12.0",
+    "next": "^15.3.2",
+    "pdf-parse": "^2.4.5",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
+    "@types/archiver": "^6.0.3",
+    "@types/js-yaml": "^4.0.9",
+    "@types/mailparser": "^3.4.6",
+    "@types/node": "^22.15.0",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "prisma": "^6.7.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,460 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SessionStatus {
+  in_progress
+  complete
+}
+
+enum QuestionType {
+  voice
+  likert
+}
+
+enum TranscriptStatus {
+  pending
+  done
+  failed
+}
+
+enum OceanDomain {
+  O
+  C
+  E
+  A
+  N
+}
+
+model Persona {
+  id             String             @id @default(uuid())
+  name           String             @unique
+  voiceRefPath   String?
+  voiceId        String? // voice binding: "<provider>:<voice_ref>" e.g. elevenlabs:<id> | qwen3tts-mlx:<adapter path>
+  /// Timestamped attestation that the training audio is the account owner's
+  /// own voice. Dataset builds REFUSE without it (factory consent rule).
+  voiceConsentAt DateTime?
+  modelBinding   String             @default("ollama/local-large")
+  packVersion    Int                @default(0)
+  createdAt     DateTime             @default(now())
+  sessions      Session[]
+  chunksPrivate VectorChunkPrivate[] @relation("privateChunks")
+  chunksPublic  VectorChunkPublic[]  @relation("publicChunks")
+  propsPrivate  PropositionPrivate[] @relation("propsPrivate")
+  propsPublic   PropositionPublic[]  @relation("propsPublic")
+  fingerprint   StyleFingerprint?
+  stylometry    StylometryRecord?
+  jobs          IngestJob[]
+}
+
+/// v2 index: atomic propositions in a neutral archivist register (the
+/// register firewall — nothing retrievable is written in the person's voice).
+/// Raw text stays in the VectorChunk tables (episodic store / v1 index),
+/// linked via sourceOrigins. Private/public physically separate (invariant 2).
+model PropositionPrivate {
+  id            String    @id
+  personaId     String
+  type          String // fact|belief|preference|decision_heuristic|experience|story_summary|insight
+  text          String
+  strength      String? // strong|moderate|weak (from hedging in the source)
+  date          DateTime?
+  topics        String[]
+  sourceOrigins String[]
+  supportIds    String[]  @default([])
+  /// Improvement-loop lifecycle. Nothing is ever deleted:
+  ///   active     — in default retrieval
+  ///   historical — was true for a period; retrieves only for past-framed questions
+  ///   superseded — extraction error, replaced outright; audit only
+  ///   merged     — parent of an augment merge; audit only
+  status        String    @default("active")
+  /// Human-readable validity period for historical chunks, e.g. "until 2026-07".
+  period        String?
+  /// Merge lineage: ids of the parent propositions an augment merge came from.
+  parentIds     String[]  @default([])
+  embedding     Unsupported("vector(384)")?
+  indexVersion  Int       @default(2)
+  createdAt     DateTime  @default(now())
+  persona       Persona   @relation("propsPrivate", fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@index([personaId])
+  @@index([personaId, status])
+}
+
+model PropositionPublic {
+  id            String    @id
+  personaId     String
+  type          String
+  text          String
+  strength      String?
+  date          DateTime?
+  topics        String[]
+  sourceOrigins String[]
+  supportIds    String[]  @default([])
+  status        String    @default("active")
+  period        String?
+  parentIds     String[]  @default([])
+  embedding     Unsupported("vector(384)")?
+  indexVersion  Int       @default(2)
+  createdAt     DateTime  @default(now())
+  persona       Persona   @relation("propsPublic", fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@index([personaId])
+  @@index([personaId, status])
+}
+
+/// Blind A/B listening results: ElevenLabs vs local voice, per listener per pair.
+model VoiceAbResult {
+  id           String   @id @default(uuid())
+  personaId    String
+  listener     String
+  sentenceIdx  Int
+  positionOfLocal String // "A" | "B" — randomized blinding
+  pick         String // "A" | "B" | "cannot_tell"
+  pickedLocal  Boolean? // resolved from blinding; null on cannot_tell
+  createdAt    DateTime @default(now())
+
+  @@index([personaId])
+}
+
+/// Computed style fingerprint, two variants (spoken/written). Lives here and
+/// in the skill pack — style NEVER enters the vector store.
+model StyleFingerprint {
+  personaId String   @id
+  spoken    Json
+  written   Json
+  updatedAt DateTime @updatedAt
+  persona   Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id          String        @id @default(uuid())
+  label       String
+  isTrial     Boolean       @default(false)
+  status      SessionStatus @default(in_progress)
+  startedAt   DateTime      @default(now())
+  completedAt DateTime?
+  personaId   String?
+  persona     Persona?      @relation(fields: [personaId], references: [id])
+  responses   Response[]
+  files       SessionFile[]
+}
+
+enum IngestStatus {
+  queued
+  running
+  embedded
+  failed
+}
+
+/// Persona retrieval indexes (pgvector). Invariant 2: private and public are
+/// PHYSICALLY SEPARATE tables — the table is the sensitivity, and the public
+/// pack build has no code path that touches the private table. id is the
+/// stable content hash, so re-ingesting identical content is a no-op.
+model VectorChunkPrivate {
+  id         String    @id
+  personaId  String
+  sourceType String
+  label      String
+  domain     String?
+  date       DateTime?
+  origin     String
+  text       String
+  tokens     Int
+  embedding  Unsupported("vector(384)")?
+  createdAt  DateTime  @default(now())
+  persona    Persona   @relation("privateChunks", fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@index([personaId])
+}
+
+model VectorChunkPublic {
+  id         String    @id
+  personaId  String
+  sourceType String
+  label      String
+  domain     String?
+  date       DateTime?
+  origin     String
+  text       String
+  tokens     Int
+  embedding  Unsupported("vector(384)")?
+  createdAt  DateTime  @default(now())
+  persona    Persona   @relation("publicChunks", fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@index([personaId])
+}
+
+/// Per-persona stylometry, updated incrementally by every ingest job's style
+/// half. Only the person's own text feeds this.
+model StylometryRecord {
+  personaId       String   @id
+  totalWords      Int      @default(0)
+  totalSentences  Int      @default(0)
+  totalLines      Int      @default(0)
+  listLines       Int      @default(0)
+  wordFreq        Json     @default("{}")
+  phraseFreq      Json     @default("{}")
+  sentenceLenHist Json     @default("{}")
+  distinctive     Json     @default("[]")
+  updatedAt       DateTime @updatedAt
+  persona         Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
+}
+
+model IngestJob {
+  id         String       @id @default(uuid())
+  personaId  String
+  kind       String // work_file | chat_zip | interview
+  fileId     String?
+  responseId String?
+  zipPath    String?
+  status     IngestStatus @default(queued)
+  error      String?
+  attempts   Int          @default(0)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  persona    Persona      @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+enum FileSensitivity {
+  private
+  public
+}
+
+model SessionFile {
+  id           String          @id @default(uuid())
+  sessionId    String
+  filename     String
+  storedPath   String
+  mimeType     String?
+  sizeBytes    Int
+  label        String
+  domain       String?
+  sensitivity  FileSensitivity @default(private)
+  note         String?
+  ingestStatus IngestStatus    @default(queued)
+  ingestError  String?
+  createdAt    DateTime        @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model Question {
+  id            String       @id @default(uuid())
+  orderIndex    Int          @unique
+  section       String
+  type          QuestionType
+  promptText    String
+  oceanDomain   OceanDomain?
+  facet         String?
+  reverseScored Boolean      @default(false)
+  isValidation  Boolean      @default(false)
+  /// Curriculum module (identity-values | communication | work-craft |
+  /// interests | validation). Null only on a pre-rebalance database.
+  module         String?
+  /// Deactivated questions stay out of the meter and future interviews but
+  /// keep their answered data — the curriculum trims, it never deletes.
+  active         Boolean     @default(true)
+  /// Invitation to upload a real artifact (demonstrated style beats described).
+  artifactInvite Boolean     @default(false)
+  responses     Response[]
+}
+
+// ───────────────────────── Improvement loop ─────────────────────────
+
+/// Every inbound item from any channel. The raw event is persisted BEFORE
+/// classification — nothing is lost even if later stages fail. Feedback
+/// firewall: rawText of correction/meta events is NEVER embedded anywhere;
+/// only distilled outputs (hot notes, exemplar pairs, new chunks) leave here.
+model UpdateEvent {
+  id             String    @id @default(uuid())
+  personaId      String
+  channel        String // playground | telegram
+  conversationId String
+  kind           String // text | audio | file
+  rawText        String? // message text or transcript
+  audioPath      String?
+  filePath       String?
+  filename       String?
+  register       String? // spoken | written (spoken for every transcript)
+  intent         String    @default("chat") // chat | correction | material | meta
+  intentSource   String    @default("default") // hint | heuristic | classifier | default
+  correctionType String? // style | factual | position | behavior (set at distillation)
+  replyToEventId String?
+  /// Persona turns log what they retrieved so a factual correction can find
+  /// the chunk that fed the wrong answer: {props: string[], episodic: string[]}
+  retrievalLog   Json?
+  sensitivity    String    @default("private")
+  status         String    @default("captured") // captured | queued | distilling | distilled | failed | none_needed
+  error          String?
+  createdAt      DateTime  @default(now())
+
+  @@index([personaId, createdAt])
+  @@index([conversationId, createdAt])
+}
+
+/// One-line distilled corrections/instructions injected into every turn until
+/// their deeper update is live in the index. Cap enforced in code.
+model HotNote {
+  id            String    @id @default(uuid())
+  personaId     String
+  note          String
+  sourceEventId String
+  /// When the note's deeper resolution is an open reconciliation case, the
+  /// note carries that pending state (persona behaves per the note meanwhile).
+  pendingCaseId String?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  retiredAt     DateTime?
+
+  @@index([personaId, active])
+}
+
+/// A disagreement between a new chunk and an existing one. Nothing here
+/// deletes anything — resolutions flip proposition status and link parents.
+model ReconCase {
+  id            String    @id @default(uuid())
+  personaId     String
+  newPropId     String
+  oldPropId     String
+  newText       String
+  oldText       String
+  tier          String // mutable | position | core
+  status        String    @default("open") // open | auto_resolved | resolved | dismissed
+  resolution    String? // augment | evolve | replace | coexist
+  confidence    Float?
+  question      String? // the one short in-chat clarification, when tier requires asking
+  theme         String? // batching key for clarification cards
+  askedInChat   Boolean   @default(false)
+  askedInConversation String?
+  askedAt       DateTime?
+  answerEventId String?
+  log           Json      @default("[]")
+  sourceEventId String?
+  createdAt     DateTime  @default(now())
+  resolvedAt    DateTime?
+
+  @@index([personaId, status])
+}
+
+/// Paired style exemplar: my corrected version against the persona's original.
+model ExemplarPair {
+  id              String   @id @default(uuid())
+  personaId       String
+  mode            String   @default("written") // spoken | written
+  personaOriginal String
+  correctedText   String
+  rule            String? // general style rule the correction implies, if any
+  sourceEventId   String
+  createdAt       DateTime @default(now())
+
+  @@index([personaId])
+}
+
+/// Every correction doubles as a regression case — a growing eval suite.
+model RegressionCase {
+  id              String    @id @default(uuid())
+  personaId       String
+  kind            String // style | factual | position | behavior
+  triggerInput    String
+  rejectedOutput  String
+  correctedOutput String
+  sourceEventId   String
+  lastResult      String? // pass | fail
+  lastRunAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([personaId])
+}
+
+/// Weak-retrieval topics that accumulate into solicitation invitations.
+model CoverageGap {
+  id            String    @id @default(uuid())
+  personaId     String
+  topic         String
+  weakCount     Int       @default(1)
+  lastInvitedAt DateTime?
+  ignoredCount  Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([personaId, topic])
+}
+
+/// Inferred generalizations awaiting one-tap approval in the playground.
+model PendingApproval {
+  id            String    @id @default(uuid())
+  personaId     String
+  kind          String // style_rule | guardrail
+  text          String
+  sourceEventId String
+  status        String    @default("pending") // pending | approved | rejected
+  createdAt     DateTime  @default(now())
+  decidedAt     DateTime?
+
+  @@index([personaId, status])
+}
+
+/// Async tier-2 work queue — same FOR UPDATE SKIP LOCKED pattern as IngestJob.
+model LoopJob {
+  id        String   @id @default(uuid())
+  personaId String
+  kind      String // classify | correction | material | meta | reconcile
+  eventId   String
+  status    String   @default("queued") // queued | running | done | failed
+  error     String?
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+/// Spot-check / re-synthesis results — the visible trend line.
+model ScoreboardEntry {
+  id        String   @id @default(uuid())
+  personaId String
+  kind      String // spot_check | resynthesis
+  metrics   Json
+  runAt     DateTime @default(now())
+
+  @@index([personaId, runAt])
+}
+
+/// Per-chat channel preferences (e.g. Telegram voice-note toggle).
+model ChannelPref {
+  id             String  @id @default(uuid())
+  channel        String
+  conversationId String
+  voiceReplies   Boolean @default(false)
+
+  @@unique([channel, conversationId])
+}
+
+model Response {
+  id                     String            @id @default(uuid())
+  sessionId              String
+  questionId             String
+  type                   QuestionType
+  audioPath              String?
+  audioDurationSec       Float?
+  transcript             String?
+  transcriptStatus       TranscriptStatus?
+  transcriptSource       String?
+  transcriptEditedByUser Boolean           @default(false)
+  likertValue            Int?
+  skipped                Boolean           @default(false)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  session  Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id])
+
+  @@unique([sessionId, questionId])
+}
