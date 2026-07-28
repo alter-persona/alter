@@ -1,5 +1,3 @@
-# Voice Personality Intake
-
 # Alter
 
 Build a digital persona of yourself, your alter ego, that chats and drafts the way you would, and gets better every time you use it.
@@ -8,10 +6,10 @@ Runs entirely on your machine. Your recordings, answers, documents, and the pers
 
 ## How it works
 
-There is no website and no forms. You talk to Alter in your own client, such as Telegram, and the conversation is the whole interface.
+The conversation is the interface. You talk to Alter in your own client, such as Telegram, and once the persona is live everything — chatting, correcting, uploading, status — happens there. (The interview itself currently runs in a bundled local web page; asking the questions directly in chat is the contracted design and is landing next.)
 
-1. **Interview in chat.** Alter asks you the personality questions directly in the client. You answer by text or voice memo, and it transcribes voice locally. Ask for a status anytime and it replies with a summary: questions answered, minutes banked, and how far off the next milestone is.
-2. **Base persona at the threshold.** Once you have answered enough of the core questions, Alter builds the base persona automatically and switches it on. You keep answering the remaining questions whenever you like, and each answer deepens the persona rather than restarting it.
+1. **Interview.** Alter asks the personality questions one at a time. You answer by voice memo or text, and it transcribes voice locally. Ask for a status anytime and it replies with the per-module progress meter and what's pending.
+2. **Base persona at the threshold.** Once you've banked enough spoken minutes and answered the core questions, one command builds the base persona and switches it on (automatic build at the threshold is landing next). You keep answering whenever you like — each answer deepens the persona rather than restarting it, and if you already have recordings, `bootstrap` activates a persona from them with no interview at all.
 3. **Enrich.** Add writing samples, documents, and exported AI chats from OpenAI or Claude. Alter keeps only your words, strips other people's text, and redacts secrets before storing.
 4. **Use.** Chat to it as a thinking partner, or hand it tasks like drafting an email in your voice.
 5. **Improve, forever.** Correct a reply and it changes on the next turn, then keeps the fix. Drop in new material and it absorbs it. When new facts clash with old ones it asks instead of overwriting: "you just said introvert, but earlier you described drawing energy from people, situational, changed, or wrong?" It keeps the richer answer, flags gaps in what it knows, and tracks its own fidelity so drift stays visible.
@@ -20,17 +18,16 @@ There is no website and no forms. You talk to Alter in your own client, such as 
 
 Replies are text by default. Turn on voice and Alter speaks back in your client:
 
-- **Custom local voice.** Runs on your machine, no key, no cloud. A generic voice, or a clone of your own from the voice memos you already recorded during the interview.
-- **ElevenLabs.** Highest quality, using your own ElevenLabs key and a clone of your voice. Your key, your account, never ours.
+- **ElevenLabs.** Highest quality today, using your own ElevenLabs key and a clone built from the voice memos you already recorded during the interview. Your key, your account, never ours.
+- **Custom local voice.** Runs on your machine, no key, no cloud — experimental. Current local clones are honestly not yet at parity (they lose a blind listening test against a professional clone), so this ships as an option, not the default.
 
-Voice replies synthesize after the text reply is already sent, so they never slow the conversation, and Alter falls back to text on any client that cannot play audio.
+Voice replies synthesize after the text reply is already sent, so they never slow the conversation, and any synthesis failure degrades silently to text. You can also ask Alter to read anything out loud in your voice on demand.
 
 ## Status
 
-Live today: the in-chat interview and base persona build. Enrichment, the full improvement loop, and voice output are specified and landing next.
+Live today: the interview (local web page) with bootstrap from existing recordings, persona synthesis, enrichment from documents and OpenAI/Claude exports, the full improvement loop (corrections, contradiction clarifications, short-term session memory with a permanent "remember this:" escape), live tools (web search, page fetch, platform skills), and voice output via ElevenLabs — including on-demand "read this in my voice."
 
-Everything runs on your machine. No third-party network calls at runtime:
-audio, transcripts, and answers live in local Postgres and `./data/audio/`.
+Landing next: the fully in-chat interview, automatic persona build at the threshold, and a local no-key voice at parity.
 
 ## Setup
 
@@ -203,14 +200,10 @@ before anything is stored; near-dups and <15-word chat fragments are dropped;
 long items chunk to 200–400 tokens; ids are stable content hashes so re-runs
 only change what changed. `corpus/`, `holdout/`, `sources/` are gitignored.
 
-## Voice persona (stage 3, local loop)
+## Voice persona (legacy local loop — not in this repo)
 
-```bash
-./voice/talk.sh          # spoken conversation: Enter to start/stop recording
-./voice/talk.sh --type   # type instead of speaking
-```
-
-Mic → whisper.cpp → persona Hermes skill (ollama/local-large) → F5-TTS
-voice clone (`.venv-tts`, zero-shot from `voice/ref.wav`) → speakers. All
-local. Refresh the persona after corpus changes:
-`npm run corpus -- build && npm run persona -- --install`.
+An earlier spoken-conversation loop (`voice/talk.sh`: mic → whisper.cpp →
+persona skill → local zero-shot voice clone) predates the current voice
+pipeline and its assets are deliberately untracked (personal audio never
+ships). It's superseded by in-chat voice notes and the `/talk` page; kept
+here only as a pointer for anyone rebuilding a fully local voice loop.
