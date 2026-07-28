@@ -1,10 +1,33 @@
 # Voice Personality Intake
 
-A local-only web app that runs a personality intake interview: records voice
-answers in the browser, transcribes them locally in the background, captures
-OCEAN Likert answers, and persists everything immediately so a sitting is
-never lost. This is the **capture stage only** — analysis and voice-clone
-generation happen later, from the export.
+# Alter
+
+Build a digital persona of yourself, your alter ego, that chats and drafts the way you would, and gets better every time you use it.
+
+Runs entirely on your machine. Your recordings, answers, documents, and the persona itself stay in local Postgres and on your disk. The only network calls go to a model API you choose, and a fully local mode needs none.
+
+## How it works
+
+There is no website and no forms. You talk to Alter in your own client, such as Telegram, and the conversation is the whole interface.
+
+1. **Interview in chat.** Alter asks you the personality questions directly in the client. You answer by text or voice memo, and it transcribes voice locally. Ask for a status anytime and it replies with a summary: questions answered, minutes banked, and how far off the next milestone is.
+2. **Base persona at the threshold.** Once you have answered enough of the core questions, Alter builds the base persona automatically and switches it on. You keep answering the remaining questions whenever you like, and each answer deepens the persona rather than restarting it.
+3. **Enrich.** Add writing samples, documents, and exported AI chats from OpenAI or Claude. Alter keeps only your words, strips other people's text, and redacts secrets before storing.
+4. **Use.** Chat to it as a thinking partner, or hand it tasks like drafting an email in your voice.
+5. **Improve, forever.** Correct a reply and it changes on the next turn, then keeps the fix. Drop in new material and it absorbs it. When new facts clash with old ones it asks instead of overwriting: "you just said introvert, but earlier you described drawing energy from people, situational, changed, or wrong?" It keeps the richer answer, flags gaps in what it knows, and tracks its own fidelity so drift stays visible.
+
+## Voice
+
+Replies are text by default. Turn on voice and Alter speaks back in your client:
+
+- **Custom local voice.** Runs on your machine, no key, no cloud. A generic voice, or a clone of your own from the voice memos you already recorded during the interview.
+- **ElevenLabs.** Highest quality, using your own ElevenLabs key and a clone of your voice. Your key, your account, never ours.
+
+Voice replies synthesize after the text reply is already sent, so they never slow the conversation, and Alter falls back to text on any client that cannot play audio.
+
+## Status
+
+Live today: the in-chat interview and base persona build. Enrichment, the full improvement loop, and voice output are specified and landing next.
 
 Everything runs on your machine. No third-party network calls at runtime:
 audio, transcripts, and answers live in local Postgres and `./data/audio/`.
