@@ -6,7 +6,7 @@
 ![Model](https://img.shields.io/badge/model-local%20or%20frontier-2ea44f)
 ![Voice](https://img.shields.io/badge/voice-ElevenLabs%20%7C%20local-orange)
 
-Alter builds a **base persona of you** from a short interview, then **never stops improving it**. As you chat, correct it, and add your own material, the skill **updates its own memory** and sharpens into you. It is an odd, absorbing thing: you are talking to yourself, and teaching yourself as you go. One person taught theirs to swear the way they do.
+Alter builds a **base persona of you** from a short interview, then **never stops improving it**. As you chat, correct it, and add your own material, the skill **updates its own memory** and sharpens into you. It is an odd, absorbing thing: you are talking to yourself, and teaching yourself as you go. Teach it to swear the way you do, if that is who you are.
 
 **Built on** [Hermes](https://hermes-agent.nousresearch.com) · Postgres + pgvector · Ollama · whisper.cpp · ElevenLabs (optional)
 
