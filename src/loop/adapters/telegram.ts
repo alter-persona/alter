@@ -36,13 +36,19 @@ const execFileP = promisify(execFile);
 const TOKEN = process.env.TELEGRAM_PERSONA_BOT_TOKEN;
 const API = () => `https://api.telegram.org/bot${TOKEN}`;
 const ALLOWED_CHAT = process.env.TELEGRAM_PERSONA_CHAT_ID; // optional lock
-const OFFSET_FILE = path.join(process.cwd(), "storage", "loop", "telegram-offset.txt");
+// Multiple adapter instances (one per bot, one persona each) must not share
+// offsets or conversation ids: everything is namespaced by the bot id.
+const BOT_ID = (TOKEN ?? "nobot").split(":")[0];
+const OFFSET_FILE = path.join(process.cwd(), "storage", "loop", `telegram-offset-${BOT_ID}.txt`);
+const convId = (chatId: number) => `tg-${BOT_ID}-${chatId}`;
 const HERMES_RUN = process.env.HERMES_RUN_PATH ?? path.join(os.homedir(), ".hermes", "bin", "hermes-run");
 const NOTES_PATH =
   process.env.PERSONA_NOTES_PATH ?? path.join(os.homedir(), ".hermes", "profiles", process.env.HERMES_PROFILE ?? "default", "memory", "notes.md");
 
 /** telegram message_id → persona UpdateEvent id (correction prior on replies). */
 const sentMap = new Map<number, string>();
+
+const lowerSafe = (s: string) => s.trim().toLowerCase();
 
 interface TgMessage {
   message_id: number;
@@ -66,9 +72,28 @@ async function tg<T>(method: string, body: Record<string, unknown>): Promise<T> 
   return json.result;
 }
 
+/** Telegram caps messages at 4096 chars — long replies are SPLIT on
+ * paragraph/line boundaries and sent in order, never silently truncated.
+ * Returns the LAST message id (replies-to for corrections track the tail). */
 async function send(chatId: number, text: string): Promise<number> {
-  const r = await tg<{ message_id: number }>("sendMessage", { chat_id: chatId, text: text.slice(0, 4000) });
-  return r.message_id;
+  const LIMIT = 3900;
+  const chunks: string[] = [];
+  let rest = text.trim();
+  while (rest.length > LIMIT) {
+    let cut = rest.lastIndexOf("\n\n", LIMIT);
+    if (cut < LIMIT * 0.5) cut = rest.lastIndexOf("\n", LIMIT);
+    if (cut < LIMIT * 0.5) cut = rest.lastIndexOf(" ", LIMIT);
+    if (cut < LIMIT * 0.5) cut = LIMIT;
+    chunks.push(rest.slice(0, cut));
+    rest = rest.slice(cut).trimStart();
+  }
+  if (rest) chunks.push(rest);
+  let lastId = 0;
+  for (const c of chunks) {
+    const r = await tg<{ message_id: number }>("sendMessage", { chat_id: chatId, text: c });
+    lastId = r.message_id;
+  }
+  return lastId;
 }
 
 async function download(fileId: string, suffix: string): Promise<string> {
@@ -151,7 +176,7 @@ function watchDelta(chatId: number, eventId: string): void {
     const report = (e?.retrievalLog as { deltaReport?: string } | null)?.deltaReport;
     if (e?.status === "distilled" && report) {
       await send(chatId, report);
-      await recordBotContent(`tg-${chatId}`, report); // discussable in-session
+      await recordBotContent(convId(chatId), report); // discussable in-session
       return;
     }
     if (e?.status === "failed") {
@@ -176,7 +201,18 @@ async function handleCommand(chatId: number, conversationId: string, text: strin
       create: { channel: "telegram", conversationId, voiceReplies: on },
       update: { voiceReplies: on },
     });
-    await send(chatId, `Voice notes ${on ? "on" : "off"} for this chat.`);
+    if (on) {
+      const { parseVoiceBinding } = await import("@/lib/tts");
+      const binding = parseVoiceBinding(persona.voiceId);
+      await send(
+        chatId,
+        binding && binding.provider !== "none"
+          ? "Voice notes on for this chat."
+          : "Voice notes toggled on — but no voice is bound for this persona yet (a clone needs 30+ recorded minutes and your consent), so replies stay text until one is."
+      );
+    } else {
+      await send(chatId, "Voice notes off for this chat.");
+    }
     return true;
   }
 
@@ -194,6 +230,13 @@ async function handleCommand(chatId: number, conversationId: string, text: strin
   const approveMatch = lower.match(/^\/?(approve|reject)\s+(\d+)$/);
   if (approveMatch) {
     await send(chatId, await decideApproval(persona.id, Number(approveMatch[2]), approveMatch[1] === "approve"));
+    return true;
+  }
+
+  if (lower === "benchmark" || lower === "/benchmark") {
+    const fp = await prisma.styleFingerprint.findUnique({ where: { personaId: persona.id } });
+    if (!fp) await send(chatId, "The benchmark runs once your base persona is live (it needs a persona to test).");
+    else runBenchmark(chatId, persona);
     return true;
   }
 
@@ -279,13 +322,182 @@ async function handleCommand(chatId: number, conversationId: string, text: strin
   return false;
 }
 
+// ── The in-chat interview (pre-active phase, + "continue interview") ─────
+import {
+  nextQuestion, renderQuestion, greeting, progress as interviewProgress,
+  saveTextAnswer, saveVoiceAnswer, saveLikert, skipQuestion,
+  interviewStatus, maybeAutoBuild, interviewSession,
+} from "../interview";
+import type { InterviewQuestion } from "../interview";
+
+/** Active-phase "continue interview": the question we just asked, awaiting an answer. */
+const pendingInterview = new Map<string, InterviewQuestion>();
+
+async function personaActive(personaId: string): Promise<boolean> {
+  const fp = await prisma.styleFingerprint.findUnique({ where: { personaId } });
+  return Boolean(fp);
+}
+
+async function askNext(chatId: number, personaId: string, prevModule: string | null, active = false): Promise<void> {
+  const q = await nextQuestion(personaId);
+  if (!q) {
+    pendingInterview.delete(convId(chatId));
+    await send(chatId, "That's every question answered — the whole curriculum. Anything new I learn from here comes from talking with you and what you upload.");
+    return;
+  }
+  const p = await interviewProgress(personaId);
+  pendingInterview.set(convId(chatId), q);
+  await send(chatId, renderQuestion(q, p.answered, p.total, q.module !== prevModule, active));
+}
+
+/** The sealed benchmark: the persona answers the eight held-out questions
+ * cold; an LLM judges substantive agreement against the real answers; the
+ * summary + gaps come back conversationally (full sheets under eval/). */
+const benchmarking = new Set<string>();
+function runBenchmark(chatId: number, persona: { id: string; name: string }): void {
+  if (benchmarking.has(persona.id)) return;
+  benchmarking.add(persona.id);
+  void (async () => {
+    try {
+      await send(chatId, "Running the benchmark: I'm answering your eight sealed questions cold, then judging myself against your real answers. This takes a while on the local model — I'll report when done.");
+      const { evalSealed } = await import("@/understudy/evaluate");
+      const r = await evalSealed(persona.id, persona.name);
+      const lines = [
+        `Benchmark done: I matched your substantive position on ${r.agreed} of ${r.judged} sealed questions.`,
+        r.gaps.length
+          ? `Where I differ from the real you:\n${r.gaps.map((g) => `• ${g}`).join("\n")}\n\nThese gaps are what corrections and more material fix — talk to me about any of them and I'll learn.`
+          : `No substantive gaps found — keep testing me with corrections anyway.`,
+        `Full blind sheet (label which answer is really you before peeking at the key): eval/blind-sheet.md`,
+      ];
+      await send(chatId, lines.join("\n\n"));
+    } catch (e) {
+      await send(chatId, `Benchmark failed: ${String(e).slice(0, 150)}`);
+    } finally {
+      benchmarking.delete(persona.id);
+    }
+  })();
+}
+
+/** Returns true when the message was consumed by the interview flow. */
+async function handleInterview(
+  chatId: number,
+  persona: { id: string; name: string },
+  m: TgMessage,
+  active: boolean
+): Promise<boolean> {
+  const text = (m.text ?? m.caption ?? "").trim();
+  const lower = text.toLowerCase();
+  const announce = (msg: string) => send(chatId, msg).then(() => {});
+
+  // Entry points.
+  if (lower === "/start" || lower === "begin" || lower === "start interview") {
+    const p = await interviewProgress(persona.id);
+    await interviewSession(persona.id);
+    if (p.answered === 0) await send(chatId, greeting(persona.name, p.total));
+    await askNext(chatId, persona.id, null, active);
+    return true;
+  }
+  if (active && (lower === "continue interview" || lower === "next question")) {
+    await askNext(chatId, persona.id, null, active);
+    return true;
+  }
+
+  const current = active ? pendingInterview.get(convId(chatId)) : await nextQuestion(persona.id);
+  if (!current) return false; // nothing pending — plain chat
+
+  // In active phase, only consume answers while a question is pending, and
+  // bail back to chat if the user is clearly asking something instead.
+  if (active && (!pendingInterview.has(convId(chatId)) || (text.includes("?") && !m.voice))) {
+    pendingInterview.delete(convId(chatId));
+    return false;
+  }
+
+  // In-band controls during the interview.
+  if (lower === "status" || lower === "/status") {
+    await send(chatId, await interviewStatus(persona.id));
+    return true;
+  }
+  if (lower === "skip") {
+    await skipQuestion(persona.id, current);
+    await askNext(chatId, persona.id, current.module, active);
+    return true;
+  }
+  if (["later", "pause", "stop", "chat", "stop questions", "done for now"].includes(lower)) {
+    pendingInterview.delete(convId(chatId));
+    await send(
+      chatId,
+      active
+        ? 'Question mode off — you\'re talking to your persona now. Say "continue interview" whenever you want more questions.'
+        : 'Paused — nothing is lost. Say "continue interview" (or "begin") whenever you\'re ready. Chatting with the persona unlocks once the base build fires.'
+    );
+    return true;
+  }
+
+  // Answers.
+  if (m.voice || m.audio) {
+    const v = (m.voice ?? m.audio)!;
+    const audioPath = await download(v.file_id, ".oga");
+    const transcript = await saveVoiceAnswer(persona.id, current, path.relative(process.cwd(), audioPath), v.duration);
+    const p = await interviewProgress(persona.id);
+    await send(chatId, `Got it — ${v.duration}s banked (${p.minutes.toFixed(1)} min total). I heard: "${transcript.slice(0, 140)}${transcript.length > 140 ? "…" : ""}"`);
+    await maybeAutoBuild(persona.id, persona.name, announce);
+    await askNext(chatId, persona.id, current.module, active);
+    if (current.isValidation && active && !(await nextQuestion(persona.id))) runBenchmark(chatId, persona);
+    return true;
+  }
+  if (m.document) {
+    // A file during an artifact invitation answers it; the file itself rides
+    // the normal material path either way.
+    if (current.artifactInvite) {
+      await saveTextAnswer(persona.id, current, `[artifact uploaded: ${m.document.file_name ?? "file"}]`);
+      void askNext(chatId, persona.id, current.module, active);
+    }
+    return false; // let the material pipeline ingest the document
+  }
+  if (text) {
+    if (current.type === "likert") {
+      const v = Number(text.match(/^[1-5]$/)?.[0]);
+      if (!v) {
+        await send(chatId, "Just a number 1-5 for this one (1 = not at all, 5 = very much).");
+        return true;
+      }
+      await saveLikert(persona.id, current, v);
+    } else {
+      await saveTextAnswer(persona.id, current, text);
+    }
+    await maybeAutoBuild(persona.id, persona.name, announce);
+    await askNext(chatId, persona.id, current.module, active);
+    if (current.isValidation && active && !(await nextQuestion(persona.id))) runBenchmark(chatId, persona);
+    return true;
+  }
+  return false;
+}
+
 // ── Main message handling ────────────────────────────────────────────────
 async function handleMessage(m: TgMessage): Promise<void> {
   const chatId = m.chat.id;
   if (ALLOWED_CHAT && String(chatId) !== ALLOWED_CHAT) return;
-  const conversationId = `tg-${chatId}`;
+  const conversationId = convId(chatId);
   const persona = await ensureDefaultPersona();
   const text = m.text ?? m.caption ?? "";
+
+  // Pre-active personas live in the interview; active ones can opt back in
+  // with "continue interview". Commands still work in both phases.
+  const active = await personaActive(persona.id);
+  if (text && (lowerSafe(text) === "/about" || lowerSafe(text) === "what are you" || lowerSafe(text) === "what are you?")) {
+    // disclosure handled by handleCommand below in both phases
+  } else if (await handleInterview(chatId, persona, m, active)) {
+    return;
+  }
+  if (!active) {
+    // No persona yet and the message wasn't an interview move: guide, don't impersonate.
+    if (text && (await handleCommand(chatId, conversationId, text))) return;
+    await send(
+      chatId,
+      "No persona exists yet — I'm still in interview mode. Say \"begin\" to start (or continue) the interview, \"status\" for progress, or run `bootstrap` from the CLI if you already have recordings."
+    );
+    return;
+  }
 
   if (text && (await handleCommand(chatId, conversationId, text))) return;
 

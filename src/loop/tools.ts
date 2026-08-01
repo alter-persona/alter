@@ -80,6 +80,23 @@ export function personaTools(): OllamaTool[] {
         },
       },
     },
+    ...(process.env.ALTER_TOOL_INSTALL === "allow"
+      ? [
+          {
+            type: "function" as const,
+            function: {
+              name: "install_skill",
+              description:
+                "Install a new skill/tool into this persona's platform profile from a GitHub repository (owner/repo or full URL). After install it becomes available to run_skill. Use web_search first if you only know the tool's name.",
+              parameters: {
+                type: "object",
+                properties: { repo: { type: "string", description: "GitHub owner/repo or https URL of the skill" } },
+                required: ["repo"],
+              },
+            },
+          },
+        ]
+      : []),
     {
       type: "function",
       function: {
@@ -169,9 +186,34 @@ export async function executeTool(
         const text = String(args.text ?? "").trim();
         if (!text) return "error: no text to speak";
         if (ctx.channel === "telegram" && ctx.conversationId?.startsWith("tg-")) {
-          return sendVoiceNoteTo(ctx.conversationId.slice(3), text);
+          // conversation ids are `tg-<botId>-<chatId>` (legacy: `tg-<chatId>`)
+          const chat = ctx.conversationId.split("-").pop()!;
+          return sendVoiceNoteTo(chat, text);
         }
         return "error: voice notes are only deliverable on Telegram — on localhost use the /talk page for live voice";
+      }
+      case "install_skill": {
+        if (process.env.ALTER_TOOL_INSTALL !== "allow") {
+          return "error: tool installation is disabled for this persona. The owner can enable it by setting ALTER_TOOL_INSTALL=allow (see the README's Tools section).";
+        }
+        const ref = String(args.repo ?? "").trim();
+        const m = ref.match(/^(?:https:\/\/github\.com\/)?([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/);
+        if (!m) return "error: give me a GitHub owner/repo (or full GitHub URL)";
+        const name = m[1].split("/")[1].toLowerCase().replace(/[^\w-]/g, "-");
+        const dest = path.join(os.homedir(), ".hermes", "profiles", HERMES_PROFILE(), "skills", name);
+        if (fscb.existsSync(dest)) return `already installed: ${name} (run_skill can use it now)`;
+        try {
+          await execFileP("git", ["clone", "--depth", "1", `https://github.com/${m[1]}.git`, dest], { timeout: 120_000 });
+          const files = fscb.readdirSync(dest).map((f) => f.toLowerCase());
+          if (!files.includes("skill.md") && !files.includes("manifest.yml")) {
+            fscb.rmSync(dest, { recursive: true, force: true });
+            return `error: ${m[1]} doesn't look like a skill (no SKILL.md/manifest.yml at its root) — removed`;
+          }
+          return `installed "${name}" from ${m[1]} — available to run_skill now. Skills: ${listSkills().join(", ")}`;
+        } catch (e) {
+          fscb.rmSync(dest, { recursive: true, force: true });
+          return `error: install failed — ${String(e).slice(0, 150)}`;
+        }
       }
       case "web_search": {
         const q = String(args.query ?? "").slice(0, 300);
@@ -237,6 +279,7 @@ upload, and you have real tools available THIS turn:
 - send_voice_note: SPEAK text aloud in the owner's cloned voice (Telegram
   voice note). When asked to "read this out" or "say it in my voice", call it
   with the full text — then confirm in one short line, don't repeat the text.
+${process.env.ALTER_TOOL_INSTALL === "allow" ? "- install_skill: install a new tool/skill from a GitHub repo into your platform profile (web_search for it first if you only have a name)." : "- (tool installation is disabled for this persona; the owner can enable it with ALTER_TOOL_INSTALL=allow)"}
 When a question needs current information or an action, CALL a tool instead
 of declining. Never claim you "cannot browse", "cannot speak or generate
 audio", are "text-based only", "fixed", or "cannot be updated" — those

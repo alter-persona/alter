@@ -438,7 +438,10 @@ async function main(): Promise<void> {
       const p = await ensureDefaultPersona();
       const which = process.argv.slice(2).filter((a) => !a.startsWith("--"))[1] ?? "sealed";
       const { evalSealed, evalBattery } = await import("./evaluate");
-      if (which === "sealed" || which === "all") console.log(`[eval] wrote ${await evalSealed(p.id, p.name)}`);
+      if (which === "sealed" || which === "all") {
+        const r = await evalSealed(p.id, p.name);
+        console.log(`[eval] wrote ${r.path} (agreement ${r.agreed}/${r.judged})`);
+      }
       if (which === "battery" || which === "all") console.log(`[eval] wrote ${await evalBattery(p.id, p.name)}`);
       break;
     }

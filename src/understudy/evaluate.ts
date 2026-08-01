@@ -45,7 +45,14 @@ async function personaAnswer(personaId: string, personaName: string, q: string):
 
 const AGREEMENT_SYSTEM = `You judge whether two answers to the same personal question take the SAME substantive position or decision — not whether they share wording. Output STRICT JSON: {"agrees": true|false, "rationale": str}. Judge substance only: same advice, same choice, same stance. Different anecdotes with the same underlying position still agree.`;
 
-export async function evalSealed(personaId: string, personaName: string): Promise<string> {
+export interface SealedEvalResult {
+  path: string;
+  judged: number;
+  agreed: number;
+  gaps: string[]; // one-line rationales where the persona DIFFERS
+}
+
+export async function evalSealed(personaId: string, personaName: string): Promise<SealedEvalResult> {
   const sealed = await prisma.question.findMany({
     where: { isValidation: true },
     orderBy: { orderIndex: "asc" },
@@ -108,7 +115,12 @@ export async function evalSealed(personaId: string, personaName: string): Promis
   ].join("\n");
   const p = path.join(EVAL_DIR(), "sealed-report.md");
   fs.writeFileSync(p, report);
-  return p;
+  return {
+    path: p,
+    judged,
+    agreed,
+    gaps: rows.filter((r) => r.agrees === false).map((r) => `${r.q.slice(0, 60)}… — ${r.rationale.slice(0, 160)}`),
+  };
 }
 
 const FIXED_TASKS: string[] = [

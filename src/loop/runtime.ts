@@ -54,6 +54,7 @@ async function defaultToolLoopGenerate(ctx: { channel: string; conversationId: s
       ...history.slice(-8).map((h) => ({ role: h.role, content: h.content }) as OllamaMsg),
       { role: "user", content: usr },
     ];
+    const numPredict = Number(process.env.TALK_NUM_PREDICT ?? 1600);
     for (let round = 0; round < 6; round++) {
       const res = await fetch(`${OLLAMA()}/api/chat`, {
         method: "POST",
@@ -63,16 +64,49 @@ async function defaultToolLoopGenerate(ctx: { channel: string; conversationId: s
           stream: false,
           think: false,
           tools,
-          options: { num_predict: 600 },
+          options: { num_predict: numPredict },
           messages,
         }),
         signal: AbortSignal.timeout(300_000),
       });
       if (!res.ok) throw new Error(`LLM ${res.status}`);
-      const msg = ((await res.json()) as { message?: OllamaMsg }).message;
+      const json = (await res.json()) as { message?: OllamaMsg; done_reason?: string };
+      const msg = json.message;
       if (!msg) throw new Error("LLM returned no message");
       const calls = msg.tool_calls ?? [];
-      if (calls.length === 0 || round === 5) return (msg.content ?? "").trim();
+      if (calls.length === 0 || round === 5) {
+        let reply = (msg.content ?? "").trim();
+        // Anti-truncation: if the token cap cut generation mid-answer, continue
+        // (up to twice) from exactly where it stopped and stitch the parts.
+        let continues = 0;
+        let doneReason = json.done_reason;
+        while (doneReason === "length" && continues < 2) {
+          continues++;
+          const contRes = await fetch(`${OLLAMA()}/api/chat`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: TALK_MODEL(),
+              stream: false,
+              think: false,
+              options: { num_predict: numPredict },
+              messages: [
+                ...messages,
+                { role: "assistant", content: reply },
+                { role: "user", content: "You were cut off mid-answer. Continue from EXACTLY where you stopped — do not repeat anything, do not apologize, just continue." },
+              ],
+            }),
+            signal: AbortSignal.timeout(300_000),
+          });
+          if (!contRes.ok) break;
+          const contJson = (await contRes.json()) as { message?: OllamaMsg; done_reason?: string };
+          const more = (contJson.message?.content ?? "").trim();
+          if (!more) break;
+          reply = `${reply}${reply.endsWith("\n") || more.startsWith("\n") ? "" : "\n"}${more}`;
+          doneReason = contJson.done_reason;
+        }
+        return reply;
+      }
       messages.push(msg);
       for (const c of calls.slice(0, 4)) {
         const result = await executeTool(c.function.name, c.function.arguments ?? {}, ctx);

@@ -10,19 +10,22 @@ const CONFIGURED_NAME = () => process.env.UNDERSTUDY_NAME?.trim();
 
 export async function ensureDefaultPersona() {
   const configured = CONFIGURED_NAME();
-  let persona = configured
-    ? await prisma.persona.findUnique({ where: { name: configured } })
-    : null;
-  if (!persona) {
-    persona = await prisma.persona.findFirst({ orderBy: { createdAt: "asc" } });
+  let persona;
+  if (configured) {
+    // A configured name is authoritative: find it or CREATE it — never fall
+    // back to some other persona (a fresh name means a fresh persona).
+    persona =
+      (await prisma.persona.findUnique({ where: { name: configured } })) ??
+      (await prisma.persona.create({ data: { name: configured } }));
+  } else {
+    persona =
+      (await prisma.persona.findFirst({ orderBy: { createdAt: "asc" } })) ??
+      (await prisma.persona.create({ data: { name: "You" } }));
   }
-  if (!persona) {
-    persona = await prisma.persona.create({ data: { name: configured ?? "You" } });
+  // Legacy backfill (single-persona era sessions) — only for the unconfigured path.
+  if (!configured) {
+    await prisma.session.updateMany({ where: { personaId: null }, data: { personaId: persona.id } });
   }
-  await prisma.session.updateMany({
-    where: { personaId: null },
-    data: { personaId: persona.id },
-  });
   return persona;
 }
 
