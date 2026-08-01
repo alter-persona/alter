@@ -6,7 +6,7 @@ import AdmZip from "adm-zip";
 import { prisma } from "@/lib/db";
 
 /**
- * Understudy CLI — the factory's command surface.
+ * Alter CLI — the factory's command surface.
  *
  *   npm run understudy -- export [--session <id>] [--out file.zip]
  *       Export an intake session (manifest + audio + files) — the format
@@ -397,7 +397,7 @@ async function health(): Promise<void> {
 
 function about(): void {
   console.log(
-    "I'm an Understudy — a digital persona built from your own words, answers, and writing, learning to answer and draft the way you would. " +
+    "I'm an Alter — a digital persona built from your own words, answers, and writing, learning to answer and draft the way you would. " +
       "Everything you give me stays on this machine in a local database; the only things that leave are the prompts sent to the model API you configured (and, only if you enable voice, the text of spoken replies to your voice provider). " +
       "You can see everything I know, correct anything I get wrong, and delete all of it with one command."
   );

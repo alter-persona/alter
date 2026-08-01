@@ -89,7 +89,7 @@ function toMarkdown(): string {
     byModule.set(q.module, [...(byModule.get(q.module) ?? []), q]);
   }
   const keeps = EXISTING_ASSIGNMENTS.filter((a) => a.active);
-  return `# Understudy intake curriculum (v2, 2026-07-28)
+  return `# Alter intake curriculum (v2, 2026-07-28)
 
 Four modules, ordered by information gain toward earliest usefulness. The
 Mini-IPIP 20-item inventory interleaves with module 1. The eight validation

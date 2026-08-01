@@ -1,8 +1,8 @@
-# What is Understudy? (a plain-language explainer)
+# What is Alter? (a plain-language explainer)
 
 You talk to it, and it learns to talk like you.
 
-Understudy is a program that lives entirely on your own computer. It asks you
+Alter is a program that lives entirely on your own computer. It asks you
 questions — the kind a good biographer would ask — and you answer by just
 talking, the way you'd leave a voice message. It also reads things you choose
 to give it: emails you're proud of, documents you've written, exports of your
@@ -33,7 +33,7 @@ local model — fast and private. *Building* the persona — distilling hours of
 your answers into organized memory — is harder, and a frontier model does it
 with noticeably more care. The reassurance: this choice is never final. Start
 free and local; if you later add an API key, one command
-(`understudy rebuild`) redoes the whole synthesis at the higher quality.
+(`alter rebuild`) redoes the whole synthesis at the higher quality.
 Nothing you recorded is ever lost or needs redoing.
 
 ## What do I get at the end?

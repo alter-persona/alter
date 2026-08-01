@@ -1,11 +1,11 @@
-# Understudy Quickstart
+# Alter Quickstart
 
 Install to your first three answered questions in about five minutes.
 
 ## 1. Install (≈3 minutes, mostly downloads)
 
 ```bash
-cd understudy
+cd alter
 ./bin/install.sh
 ```
 
@@ -19,15 +19,15 @@ questions:
 - **Your build model** — press Enter for local-only (Ollama; fully offline,
   slower and slightly rougher synthesis), or paste an API key for the
   recommended frontier model. You can change this anytime and re-run
-  `understudy rebuild`.
+  `alter rebuild`.
 
 It finishes by running the health check. All green means go.
 
 ## 2. Verify
 
 ```bash
-./bin/understudy health   # every line should be ✔
-./bin/understudy status   # phase: interviewing, meter at 0%
+./bin/alter health   # every line should be ✔
+./bin/alter status   # phase: interviewing, meter at 0%
 ```
 
 ## 3. Answer your first three questions
@@ -44,10 +44,10 @@ prints). It will ask one question at a time — answer in a voice memo or text:
 
 ## Already have recordings?
 
-If you have an intake export zip from a previous Understudy (or this one):
+If you have an intake export zip from a previous Alter (or this one):
 
 ```bash
-./bin/understudy bootstrap your-export.zip --name "Your Name"
+./bin/alter bootstrap your-export.zip --name "Your Name"
 ```
 
 That imports the answers and audio, credits the banked minutes, runs the
@@ -57,7 +57,7 @@ the same time.
 
 ## What next
 
-- `./bin/understudy status` any time — phase, module meter, pending items.
+- `./bin/alter status` any time — phase, module meter, pending items.
 - Drop files (emails you're proud of, documents) into the chat — real
   artifacts teach style better than any description.
 - When it gets something wrong, just say so. Corrections apply from the very

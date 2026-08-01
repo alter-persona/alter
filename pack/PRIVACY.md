@@ -1,4 +1,4 @@
-# Understudy Privacy
+# Alter Privacy
 
 ## Local-first storage
 
@@ -45,7 +45,7 @@ public pack. When in doubt, everything defaults to private.
 Eight interview questions are held out for honest evaluation. Their answers
 are stored but excluded from every ingestion path — enforced by question id
 AND by content matching, so even a pasted copy of a sealed answer is refused.
-This is what lets Understudy measure itself without grading on the training
+This is what lets Alter measure itself without grading on the training
 set.
 
 ## Your feedback is not persona content
@@ -57,7 +57,7 @@ believe. Verified by test.
 ## How to delete everything
 
 ```bash
-./bin/understudy delete-everything --yes   # wipes all database content
+./bin/alter delete-everything --yes   # wipes all database content
 rm -rf data/ corpus/                       # removes audio, files, packs
 ```
 

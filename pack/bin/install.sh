@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Understudy installer — brings a clean machine to a passing health check.
+# Alter installer — brings a clean machine to a passing health check.
 set -euo pipefail
 cd "$(dirname "$0")/../services"
 
 say()  { printf '\n\033[1m%s\033[0m\n' "$*"; }
 need() { command -v "$1" >/dev/null 2>&1; }
 
-say "Understudy installer"
+say "Alter installer"
 
 # ── 1. Dependencies ─────────────────────────────────────────────
 MISSING=()
@@ -74,9 +74,9 @@ if [ ! -f .env ]; then
       echo "CORPUS_LLM_PROVIDER=openai_compatible"
       echo "CORPUS_LLM_URL=http://127.0.0.1:11434/v1"
       echo "CORPUS_LLM_MODEL=\${UNDERSTUDY_LOCAL_MODEL:-llama3.1:8b}"
-      echo "# Local build model configured. Understudy will synthesize with it, and the"
+      echo "# Local build model configured. Alter will synthesize with it, and the"
       echo "# quality floor warning applies: a frontier model is recommended. Adding a"
-      echo "# key later + 'understudy rebuild' re-synthesizes everything — nothing lost."
+      echo "# key later + 'alter rebuild' re-synthesizes everything — nothing lost."
     fi
   } > .env
   chmod 600 .env
@@ -95,4 +95,4 @@ node -e 'import("./src/lib/embedder.js").catch(()=>null)' 2>/dev/null || \
 # ── 6. Health check ─────────────────────────────────────────────
 say "Health check"
 npx tsx src/understudy/cli.ts health
-say "Done. Next: ./bin/understudy status — then start answering questions."
+say "Done. Next: ./bin/alter status — then start answering questions."

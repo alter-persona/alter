@@ -1,10 +1,10 @@
-name: understudy
+name: alter
 version: 1
 generalisable: true
 created_by_agent: false
 mode: llm
 description: |
-  Understudy — a skill that studies you until it can stand in for you.
+  Alter — a skill that studies you until it can stand in for you.
   Interviews the user conversationally (voice memos preferred), ingests their
   documents and AI chat exports, and synthesizes a digital persona that
   answers and drafts the way they would. Requires the companion local

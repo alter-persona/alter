@@ -1,5 +1,5 @@
 /**
- * Seed for FRESH installs: builds the full Understudy curriculum (v2,
+ * Seed for FRESH installs: builds the full Alter curriculum (v2,
  * four modules ordered by information gain) from src/curriculum/curriculum.ts.
  * No external file needed. The Mini-IPIP (Donnellan, Oberauer, Baird & Lucas,
  * 2006; public-domain, ipip.ori.org) interleaves with module 1.

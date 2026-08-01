@@ -23,7 +23,8 @@
     "loop:telegram": "tsx src/loop/adapters/telegram.ts",
     "test:loop": "tsx --test tests/loop/*.test.ts",
     "curriculum": "tsx src/curriculum/cli.ts",
-    "understudy": "tsx src/understudy/cli.ts"
+    "understudy": "tsx src/understudy/cli.ts",
+    "alter": "tsx src/understudy/cli.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

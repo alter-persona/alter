@@ -1,5 +1,5 @@
 /**
- * The Understudy curriculum — single source of truth.
+ * The Alter curriculum — single source of truth.
  *
  * Four modules ordered by information gain toward earliest usefulness:
  * a thin identity spine first (voice + values + decision habits), then

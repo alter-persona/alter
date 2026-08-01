@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Build the distributable Understudy pack: pack files + trimmed services,
+# Build the distributable Alter pack: pack files + trimmed services,
 # checksums, signature, and a personal-data scan that FAILS the build if any
 # of the author's personal data appears anywhere in the pack.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${1:-0.1.0}"
-OUT="$REPO/dist/understudy-v$VERSION"
+OUT="$REPO/dist/alter-v$VERSION"
 
 rm -rf "$OUT"
 mkdir -p "$OUT/services" "$OUT/bin" "$OUT/docs"
@@ -13,7 +13,7 @@ mkdir -p "$OUT/services" "$OUT/bin" "$OUT/docs"
 # ── Pack surface ────────────────────────────────────────────────
 cp "$REPO/pack/SKILL.md" "$REPO/pack/manifest.yml" "$OUT/"
 cp "$REPO/pack/README.md" "$REPO/pack/QUICKSTART.md" "$REPO/pack/EXPLAINER.md" "$REPO/pack/PRIVACY.md" "$OUT/docs/"
-cp "$REPO/pack/bin/install.sh" "$REPO/pack/bin/health.sh" "$REPO/pack/bin/understudy" "$OUT/bin/"
+cp "$REPO/pack/bin/install.sh" "$REPO/pack/bin/health.sh" "$REPO/pack/bin/alter" "$OUT/bin/"
 chmod +x "$OUT"/bin/*
 
 # ── Services: the repo, trimmed of personal data and legacy v1 ──
@@ -44,7 +44,7 @@ fs.writeFileSync(p, JSON.stringify(d, null, 2) + "\n");
 # regex per line) — the owner's identifying strings must never ship, not even
 # inside the scanner that guards against them.
 echo "[pack] personal-data scan…"
-PATTERNS=()
+PATTERNS=("Understudy" "understudy-v")
 if [ -f "$REPO/pack/scan-patterns.local.txt" ]; then
   while IFS= read -r line; do
     [ -n "$line" ] && [ "${line#\#}" = "$line" ] && PATTERNS+=("$line")

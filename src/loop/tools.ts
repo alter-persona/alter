@@ -8,7 +8,7 @@ const execFileP = promisify(execFile);
 
 /**
  * Live tools for the persona runtime — the Hermes agent's hands, attached to
- * the Understudy voice. Executed via native Ollama tool calling inside the
+ * the persona voice. Executed via native Ollama tool calling inside the
  * generation loop. Kept deliberately tight:
  *   web_search  — local SearXNG (falls back to nothing gracefully)
  *   fetch_url   — HTTP GET, HTML stripped, 8KB cap
@@ -232,7 +232,7 @@ export async function executeTool(
         if (!/^https?:\/\//.test(url)) return "error: http(s) URLs only";
         const res = await fetch(url, {
           signal: AbortSignal.timeout(15_000),
-          headers: { "User-Agent": "Mozilla/5.0 (Macintosh) UnderstudyPersona/1.0" },
+          headers: { "User-Agent": "Mozilla/5.0 (Macintosh) AlterPersona/1.0" },
         });
         if (!res.ok) return `error: ${res.status}`;
         return stripHtml(await res.text()).slice(0, 8000);

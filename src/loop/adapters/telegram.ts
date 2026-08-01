@@ -243,7 +243,7 @@ async function handleCommand(chatId: number, conversationId: string, text: strin
   if (lower === "/about" || lower === "what are you" || lower === "what are you?") {
     await send(
       chatId,
-      `I'm an Understudy — a digital persona built from ${persona.name}'s own words, answers, and writing, learning to answer and draft the way they would. Everything stays on this machine in a local database; the only things that leave are prompts to the configured model API (and, with voice on, the reply text to the voice provider). You can see everything I know, correct anything, and delete it all with one command.`
+      `I'm an Alter — a digital persona built from ${persona.name}'s own words, answers, and writing, learning to answer and draft the way they would. Everything stays on this machine in a local database; the only things that leave are prompts to the configured model API (and, with voice on, the reply text to the voice provider). You can see everything I know, correct anything, and delete it all with one command.`
     );
     return true;
   }
