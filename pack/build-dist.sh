@@ -5,7 +5,7 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${1:-0.1.0}"
-OUT="$REPO/dist/alter-v$VERSION"
+OUT="$REPO/dist/alter"
 
 rm -rf "$OUT"
 mkdir -p "$OUT/services" "$OUT/bin" "$OUT/docs"
