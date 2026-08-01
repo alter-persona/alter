@@ -11,7 +11,7 @@ rm -rf "$OUT"
 mkdir -p "$OUT/services" "$OUT/bin" "$OUT/docs"
 
 # ── Pack surface ────────────────────────────────────────────────
-cp "$REPO/pack/SKILL.md" "$REPO/pack/manifest.yml" "$OUT/"
+cp "$REPO/skills/alter/SKILL.md" "$REPO/pack/manifest.yml" "$OUT/"
 cp "$REPO/pack/README.md" "$REPO/pack/QUICKSTART.md" "$REPO/pack/EXPLAINER.md" "$REPO/pack/PRIVACY.md" "$OUT/docs/"
 cp "$REPO/pack/bin/install.sh" "$REPO/pack/bin/health.sh" "$REPO/pack/bin/alter" "$OUT/bin/"
 chmod +x "$OUT"/bin/*
