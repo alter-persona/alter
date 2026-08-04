@@ -52,6 +52,27 @@ Alter is a skill for [Hermes](https://hermes-agent.nousresearch.com), the self-i
 
 ---
 
+## Install
+
+The skill is one `SKILL.md` in the standard [agent skills](https://agentskills.io) layout, so it installs into any host that speaks the format. Pick the line that matches yours:
+
+| Host | Command |
+| --- | --- |
+| Hermes | `hermes skills tap add alter-persona/alter` |
+| OpenClaw | `clawhub install alter` |
+| Claude Code, Codex, Cursor, and friends | `npx skills add alter-persona/alter` |
+| GitHub CLI | `gh skill install alter-persona/alter` |
+
+Hermes can also pull it straight from the well-known endpoint:
+
+```bash
+hermes skills install well-known:https://alter-persona.github.io/.well-known/skills/alter
+```
+
+Installing the skill gives your agent the behavior contract. The services it drives — database, transcription, corpus — are set up once in [Setup](#setup) below.
+
+---
+
 ## Architecture
 
 A message arrives on any surface. The persona core sits in the cached prompt prefix, so every reply is shaped by your style and values at no retrieval cost. A gate decides whether the turn needs depth and, only when it does, pulls a few short chunks from your vector store. The model then composes the reply, voice is optional, and your corrections and uploads write back into the store.
