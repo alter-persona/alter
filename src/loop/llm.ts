@@ -17,21 +17,28 @@ export function setLoopLlmForTests(fn: LoopLlm | null): void {
   testStub = fn;
 }
 
-function openaiCompatible(ref: ModelRef): LoopLlm {
+/** Request shape for an OpenAI-compatible ref. Ollama (anything on :11434)
+ * gets the native /api/chat route with think:false (project convention):
+ * qwen-family models THINK by default on the OpenAI-compat path and can burn
+ * minutes of reasoning tokens per call, then die on Ollama's 5-minute 500.
+ * Exported so the branch is testable without a server. */
+export function buildLoopLlmRequest(ref: ModelRef, system: string, user: string): { target: string; body: object; native: boolean } {
   const base = (ref.url ?? "http://127.0.0.1:11434/v1").replace(/\/$/, "");
-  // Ollama gets the native /api/chat with think:false (project convention) —
-  // qwen-family models THINK by default on the OpenAI-compat path and can
-  // burn minutes of reasoning tokens per call.
-  const isOllama = /:11434\b/.test(base);
+  const native = /:11434\b/.test(base);
+  const target = native ? `${base.replace(/\/v1$/, "")}/api/chat` : `${base}/chat/completions`;
+  const messages = [
+    { role: "system", content: system },
+    { role: "user", content: user },
+  ];
+  const body = native
+    ? { model: ref.model, stream: false, think: false, options: { temperature: 0.2 }, messages }
+    : { model: ref.model, messages, temperature: 0.2 };
+  return { target, body, native };
+}
+
+function openaiCompatible(ref: ModelRef): LoopLlm {
   return async (system, user) => {
-    const target = isOllama ? `${base.replace(/\/v1$/, "")}/api/chat` : `${base}/chat/completions`;
-    const messages = [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ];
-    const body = isOllama
-      ? { model: ref.model, stream: false, think: false, options: { temperature: 0.2 }, messages }
-      : { model: ref.model, messages, temperature: 0.2 };
+    const { target, body, native } = buildLoopLlmRequest(ref, system, user);
     const res = await fetch(target, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -39,7 +46,7 @@ function openaiCompatible(ref: ModelRef): LoopLlm {
       signal: AbortSignal.timeout(420_000),
     });
     if (!res.ok) throw new Error(`LLM ${res.status}: ${(await res.text()).slice(0, 200)}`);
-    if (isOllama) {
+    if (native) {
       const json = (await res.json()) as { message?: { content?: string } };
       const content = json.message?.content;
       if (typeof content !== "string") throw new Error("LLM response missing content");

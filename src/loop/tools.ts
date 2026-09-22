@@ -122,41 +122,73 @@ export interface ToolContext {
   conversationId?: string;
 }
 
-/** Synthesize text in the persona's bound voice and send as a Telegram voice
- * note (OGG/Opus). Explicit requests override the per-chat auto-voice toggle. */
-export async function sendVoiceNoteTo(chatId: string, text: string): Promise<string> {
-  const TOKEN = process.env.TELEGRAM_PERSONA_BOT_TOKEN;
-  if (!TOKEN) return "error: no Telegram bot token configured";
-  const { prisma } = await import("@/lib/db");
+/** The pieces of the voice-note path that touch the outside world, so tests
+ * can replace them: persona lookup, synthesis, OGG conversion, Telegram send. */
+export interface VoiceNoteDeps {
+  persona: () => Promise<{ voiceId: string | null }>;
+  synthesize: (text: string, binding: { provider: string; voiceRef: string }) => Promise<Buffer>;
+  toOgg: (audio: Buffer) => Promise<Buffer>;
+  send: (chatId: string, ogg: Buffer) => Promise<{ ok: boolean; status: number }>;
+}
+
+let voiceNoteDepsOverride: Partial<VoiceNoteDeps> | null = null;
+export function setVoiceNoteDepsForTests(deps: Partial<VoiceNoteDeps> | null): void {
+  voiceNoteDepsOverride = deps;
+}
+
+async function defaultVoiceNoteDeps(): Promise<VoiceNoteDeps> {
   const { ensureDefaultPersona } = await import("@/lib/personas");
-  const { parseVoiceBinding, getTtsProvider, stripUnsupportedTags } = await import("@/lib/tts");
+  const { getTtsProvider } = await import("@/lib/tts");
   const fsp = await import("node:fs/promises");
-  let tmpIn: string | null = null;
-  let tmpOut: string | null = null;
+  return {
+    persona: () => ensureDefaultPersona(),
+    synthesize: async (text, binding) =>
+      (await getTtsProvider(binding as Parameters<typeof getTtsProvider>[0]).synthesize(text, binding.voiceRef)).audio,
+    toOgg: async (audio) => {
+      const tmpIn = path.join(os.tmpdir(), `sv-${Date.now()}-${Math.random().toString(36).slice(2)}.mp3`);
+      const tmpOut = tmpIn.replace(/\.mp3$/, ".ogg");
+      try {
+        await fsp.writeFile(tmpIn, audio);
+        await execFileP("ffmpeg", ["-y", "-i", tmpIn, "-c:a", "libopus", "-b:a", "48k", "-ar", "48000", "-ac", "1", tmpOut]);
+        return await fsp.readFile(tmpOut);
+      } finally {
+        await fsp.unlink(tmpIn).catch(() => {});
+        await fsp.unlink(tmpOut).catch(() => {});
+      }
+    },
+    send: async (chatId, ogg) => {
+      const TOKEN = process.env.TELEGRAM_PERSONA_BOT_TOKEN;
+      if (!TOKEN) return { ok: false, status: 0 };
+      const form = new FormData();
+      form.append("chat_id", chatId);
+      form.append("voice", new Blob([new Uint8Array(ogg)], { type: "audio/ogg" }), "reply.ogg");
+      const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendVoice`, { method: "POST", body: form });
+      return { ok: res.ok, status: res.status };
+    },
+  };
+}
+
+/** Synthesize text in the persona's bound voice and send as a Telegram voice
+ * note (OGG/Opus). Explicit requests override the per-chat auto-voice toggle.
+ * Every failure returns an error string; it never throws into the tool loop. */
+export async function sendVoiceNoteTo(chatId: string, text: string): Promise<string> {
+  if (!voiceNoteDepsOverride && !process.env.TELEGRAM_PERSONA_BOT_TOKEN) return "error: no Telegram bot token configured";
+  const { parseVoiceBinding, stripUnsupportedTags } = await import("@/lib/tts");
   try {
-    const persona = await ensureDefaultPersona();
+    const deps: VoiceNoteDeps = { ...(await defaultVoiceNoteDeps()), ...(voiceNoteDepsOverride ?? {}) };
+    const persona = await deps.persona();
     const binding = parseVoiceBinding(persona.voiceId);
     if (!binding || binding.provider === "none") {
       return "error: no voice is bound for this persona";
     }
     const speak = stripUnsupportedTags(text.replace(/[*_`#>]/g, ""), binding.provider).slice(0, 2400);
-    const out = await getTtsProvider(binding).synthesize(speak, binding.voiceRef);
-    tmpIn = path.join(os.tmpdir(), `sv-${Date.now()}.mp3`);
-    tmpOut = tmpIn.replace(/\.mp3$/, ".ogg");
-    await fsp.writeFile(tmpIn, out.audio);
-    await execFileP("ffmpeg", ["-y", "-i", tmpIn, "-c:a", "libopus", "-b:a", "48k", "-ar", "48000", "-ac", "1", tmpOut]);
-    const form = new FormData();
-    form.append("chat_id", chatId);
-    form.append("voice", new Blob([new Uint8Array(await fsp.readFile(tmpOut))], { type: "audio/ogg" }), "reply.ogg");
-    const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendVoice`, { method: "POST", body: form });
+    const audio = await deps.synthesize(speak, binding);
+    const ogg = await deps.toOgg(audio);
+    const res = await deps.send(chatId, ogg);
     if (!res.ok) return `error: sendVoice ${res.status}`;
-    await prisma.$queryRaw`SELECT 1`; // keep client warm; no-op
     return `voice note sent (${Math.round(speak.length / 14)}s approx). Do not repeat the spoken text in your reply — just confirm briefly.`;
   } catch (e) {
     return `error: ${String(e).slice(0, 200)}`;
-  } finally {
-    if (tmpIn) await fsp.unlink(tmpIn).catch(() => {});
-    if (tmpOut) await fsp.unlink(tmpOut).catch(() => {});
   }
 }
 

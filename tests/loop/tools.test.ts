@@ -132,3 +132,47 @@ test("tool loop: a length-truncated answer is continued and stitched", async () 
   const cont = fake.bodies[1].messages.pop();
   assert.match(cont.content, /Continue from EXACTLY where you stopped/);
 });
+
+// ── send_voice_note, with every outside-world piece stubbed ─────────────────
+import { sendVoiceNoteTo, setVoiceNoteDepsForTests } from "../../src/loop/tools";
+
+test("send_voice_note: synthesizes, converts, sends, and degrades to an error string", async () => {
+  const sent: { chatId: string; bytes: number }[] = [];
+  const base = {
+    persona: async () => ({ voiceId: "elevenlabs:fixture-voice" }),
+    synthesize: async (text: string) => Buffer.from(`MP3:${text}`),
+    toOgg: async (audio: Buffer) => Buffer.concat([Buffer.from("OGG:"), audio]),
+    send: async (chatId: string, ogg: Buffer) => {
+      sent.push({ chatId, bytes: ogg.length });
+      return { ok: true, status: 200 };
+    },
+  };
+  try {
+    setVoiceNoteDepsForTests(base);
+    const ok = await sendVoiceNoteTo("12345", "Read *this* aloud.");
+    assert.match(ok, /^voice note sent/);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].chatId, "12345");
+    assert.ok(sent[0].bytes > 4, "converted audio reached the sender");
+
+    // No voice bound: refuses before synthesizing.
+    setVoiceNoteDepsForTests({ ...base, persona: async () => ({ voiceId: null }) });
+    assert.equal(await sendVoiceNoteTo("1", "x"), "error: no voice is bound for this persona");
+
+    // Synthesis failure degrades to an error string, never a throw.
+    setVoiceNoteDepsForTests({ ...base, synthesize: async () => { throw new Error("provider down"); } });
+    assert.match(await sendVoiceNoteTo("1", "x"), /^error: .*provider down/);
+
+    // Telegram rejection surfaces the status.
+    setVoiceNoteDepsForTests({ ...base, send: async () => ({ ok: false, status: 403 }) });
+    assert.equal(await sendVoiceNoteTo("1", "x"), "error: sendVoice 403");
+
+    // Routed through executeTool: only Telegram conversations can receive one.
+    setVoiceNoteDepsForTests(base);
+    assert.match(await executeTool("send_voice_note", { text: "hi" }, { channel: "telegram", conversationId: "tg-999-777" }), /^voice note sent/);
+    assert.equal(sent[sent.length - 1].chatId, "777");
+    assert.match(await executeTool("send_voice_note", { text: "hi" }, { channel: "playground", conversationId: "p1" }), /only deliverable on Telegram/);
+  } finally {
+    setVoiceNoteDepsForTests(null);
+  }
+});
