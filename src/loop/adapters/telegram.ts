@@ -564,6 +564,13 @@ async function handleMessage(m: TgMessage): Promise<void> {
     mode: m.voice ? "spoken" : "written",
   });
 
+  if (!turn.reply.trim()) {
+    // The tool loop ran out of rounds or the model returned nothing — say so
+    // instead of leaving the owner staring at an empty chat.
+    console.error(`[tg] empty reply for ${conversationId} (message: ${message.slice(0, 80)})`);
+    await send(chatId, "I hit a snag generating that reply (the model came back empty). Ask again — if it repeats, the tool loop is looping.");
+    return;
+  }
   const msgId = await send(chatId, turn.reply);
   sentMap.set(msgId, turn.personaEventId);
   if (sentMap.size > 500) sentMap.delete(sentMap.keys().next().value!);
