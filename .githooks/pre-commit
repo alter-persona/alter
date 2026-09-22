@@ -26,5 +26,19 @@ while IFS= read -r f; do
     && { echo "✖ pre-commit: secret-shaped string in $f"; FAIL=1; }
 done <<< "$STAGED"
 
+# 4. Owner-identifying strings (pack/scan-patterns.local.txt, untracked, one
+#    regex per line) must not enter history either. Same list the pack build
+#    uses; absent file = skip.
+if [ -f pack/scan-patterns.local.txt ]; then
+  while IFS= read -r pat; do
+    [ -z "$pat" ] && continue
+    case "$pat" in \#*) continue ;; esac
+    while IFS= read -r f; do
+      echo "$f" | grep -qE "$ALLOW" && continue
+      git show ":$f" 2>/dev/null | grep -qE "$pat" && { echo "✖ pre-commit: personal pattern '$pat' in $f"; FAIL=1; }
+    done <<< "$STAGED"
+  done < pack/scan-patterns.local.txt
+fi
+
 [ "$FAIL" -eq 0 ] || { echo "pre-commit: blocked. Fix or consciously --no-verify."; exit 1; }
 exit 0

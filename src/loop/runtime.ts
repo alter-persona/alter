@@ -41,8 +41,15 @@ interface OllamaMsg {
   tool_name?: string;
 }
 
-async function defaultToolLoopGenerate(ctx: { channel: string; conversationId: string }) {
+/** Build the native tool-calling generator. Exported for tests, which pass a
+ * fake fetch; production uses the global fetch against OLLAMA_URL. */
+export async function createToolLoopGenerate(
+  ctx: { channel: string; conversationId: string },
+  fetchImpl: typeof fetch = fetch
+) {
   const { personaTools, executeTool } = await import("./tools");
+  const { loadToolsExtension } = await import("./extensions");
+  await loadToolsExtension();
   const tools = personaTools();
   return async (
     sys: string,
@@ -56,7 +63,7 @@ async function defaultToolLoopGenerate(ctx: { channel: string; conversationId: s
     ];
     const numPredict = Number(process.env.TALK_NUM_PREDICT ?? 1600);
     for (let round = 0; round < 6; round++) {
-      const res = await fetch(`${OLLAMA()}/api/chat`, {
+      const res = await fetchImpl(`${OLLAMA()}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -74,6 +81,16 @@ async function defaultToolLoopGenerate(ctx: { channel: string; conversationId: s
       const msg = json.message;
       if (!msg) throw new Error("LLM returned no message");
       const calls = msg.tool_calls ?? [];
+      if (calls.length > 0 && round === 4) {
+        // Last tool round coming up: after these results, demand prose.
+        messages.push(msg);
+        for (const c of calls.slice(0, 4)) {
+          const result = await executeTool(c.function.name, c.function.arguments ?? {}, ctx);
+          messages.push({ role: "tool", content: result, tool_name: c.function.name });
+        }
+        messages.push({ role: "user", content: "[system] Tool budget for this turn is used up. Reply to the owner now in prose using what you have. Do not mention or acknowledge this note." });
+        continue;
+      }
       if (calls.length === 0 || round === 5) {
         let reply = (msg.content ?? "").trim();
         // Anti-truncation: if the token cap cut generation mid-answer, continue
@@ -82,7 +99,7 @@ async function defaultToolLoopGenerate(ctx: { channel: string; conversationId: s
         let doneReason = json.done_reason;
         while (doneReason === "length" && continues < 2) {
           continues++;
-          const contRes = await fetch(`${OLLAMA()}/api/chat`, {
+          const contRes = await fetchImpl(`${OLLAMA()}/api/chat`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -218,6 +235,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
   // describe itself as static or tool-less).
   const deltaRules = readStyleDelta(persona.id);
   const { renderCapabilities } = await import("./tools");
+  await (await import("./extensions")).loadToolsExtension();
   let contract = `${renderCapabilities()}\n\n${renderResponseContract({ name: persona.name, voiceNote: Boolean(input.voiceNote) })}`;
   if (deltaRules.length > 0) {
     contract += `\n\nAdditional standing rules from the real person's corrections:\n${deltaRules
@@ -266,7 +284,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
   // the loop, max 5 tool rounds. A tool failure never breaks the reply.
   const generate =
     input.generate ??
-    (await defaultToolLoopGenerate({ channel: input.channel, conversationId: input.conversationId }));
+    (await createToolLoopGenerate({ channel: input.channel, conversationId: input.conversationId }));
   let reply = await generate(system, user, input.history);
 
   // ── Solicitation: one clarification OR one invitation per conversation ─

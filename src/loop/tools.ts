@@ -4,6 +4,8 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+import { currentToolsExtension } from "./extensions";
+
 const execFileP = promisify(execFile);
 
 /**
@@ -14,6 +16,7 @@ const execFileP = promisify(execFile);
  *   fetch_url   — HTTP GET, HTML stripped, 8KB cap
  *   run_skill   — Hermes skills from the configured profile (passthrough)
  *   read_notes  — the personal notes file
+ *   + any tools an extension module adds (ALTER_TOOLS_EXTENSION, see extensions.ts)
  * Everything degrades to a clear error string; a tool failure never breaks
  * the reply, the model just answers with what it has.
  */
@@ -110,6 +113,7 @@ export function personaTools(): OllamaTool[] {
         },
       },
     },
+    ...(currentToolsExtension()?.tools?.() ?? []),
   ];
 }
 
@@ -257,8 +261,14 @@ export async function executeTool(
           .slice(-n);
         return lines.join("\n") || "no notes yet";
       }
-      default:
+      default: {
+        const ext = currentToolsExtension();
+        if (ext?.execute) {
+          const r = await ext.execute(name, args, ctx);
+          if (r !== null && r !== undefined) return r;
+        }
         return `error: unknown tool "${name}"`;
+      }
     }
   } catch (e) {
     return `error: ${String(e).slice(0, 200)}`;
@@ -279,6 +289,7 @@ upload, and you have real tools available THIS turn:
 - send_voice_note: SPEAK text aloud in the owner's cloned voice (Telegram
   voice note). When asked to "read this out" or "say it in my voice", call it
   with the full text — then confirm in one short line, don't repeat the text.
+${currentToolsExtension()?.capabilities?.()?.trim() ?? ""}
 ${process.env.ALTER_TOOL_INSTALL === "allow" ? "- install_skill: install a new tool/skill from a GitHub repo into your platform profile (web_search for it first if you only have a name)." : "- (tool installation is disabled for this persona; the owner can enable it with ALTER_TOOL_INSTALL=allow)"}
 When a question needs current information or an action, CALL a tool instead
 of declining. Never claim you "cannot browse", "cannot speak or generate
