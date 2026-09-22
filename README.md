@@ -2,13 +2,13 @@
 
 **Your alter ego, built from your own words.**
 
-![Runs on Hermes](https://img.shields.io/badge/runs%20on-Hermes-6E56CF)
-![Model](https://img.shields.io/badge/model-local%20or%20frontier-2ea44f)
+![Skill format](https://img.shields.io/badge/skill-agentskills.io-6E56CF)
+![Model](https://img.shields.io/badge/model-any%20OpenAI--compatible%20endpoint-2ea44f)
 ![Voice](https://img.shields.io/badge/voice-ElevenLabs%20%7C%20local-orange)
 
 Alter builds a **base persona of you** from a short interview, then **never stops improving it**. As you chat, correct it, and add your own material, the skill **updates its own memory** and sharpens into you. It is an odd, absorbing thing: you are talking to yourself, and teaching yourself as you go. One person taught theirs to swear the way they do.
 
-**Built on** [Hermes](https://hermes-agent.nousresearch.com) · Postgres + pgvector · Ollama · whisper.cpp · ElevenLabs (optional)
+**Works with** any agent-skills host ([Hermes](https://hermes-agent.nousresearch.com), OpenClaw, Claude Code, Cursor, Codex) · Postgres + pgvector · any OpenAI-compatible model endpoint, local or cloud · whisper.cpp · ElevenLabs (optional)
 
 ```mermaid
 flowchart LR
@@ -36,16 +36,16 @@ You talk to Alter in your own chat client, such as Telegram. There is no form to
 
 ---
 
-## Runs on Hermes
+## Runs on any skills host
 
-Alter is a skill for [Hermes](https://hermes-agent.nousresearch.com), the self-improving agent from Nous Research. Hermes handles the chat surfaces, the model routing, and its own memory. Alter is the persona that sits on top.
+Alter ships as one `SKILL.md` in the standard [agent skills](https://agentskills.io) layout, so any host that reads the format can load the behavior contract: [Hermes](https://hermes-agent.nousresearch.com) from Nous Research, OpenClaw, Claude Code, Cursor, Codex, and others. The companion services do the heavy work (transcription, embedding, synthesis, the improvement loop) and include their own Telegram adapter, so Alter also runs with no host at all.
 
 | Layer | What you get |
 | --- | --- |
-| **Model** | Model-agnostic. Build with a frontier model, through your own OpenAI, Anthropic, or OpenRouter key or Nous Portal, for the sharpest persona. Run the live persona on a local model through Ollama to keep generation on your machine. Start local and rebuild under a stronger model later, since your raw material is kept. |
-| **Surfaces** | One agent, one memory, many channels: CLI, Telegram, Discord, Slack, WhatsApp, Signal, and more. It is the same persona everywhere. |
-| **Integrations** | Slot-in tools and services. Voice is the first, and others connect the same way through Hermes tools and plugins. |
-| **Your data** | The persona corpus lives in your local database, and Hermes keeps its own config and memory under `~/.hermes`. Nothing about you goes to a service the author runs, because there is no such service. |
+| **Model** | Model-agnostic. Point Alter at any OpenAI-compatible endpoint: a local server such as Ollama, LM Studio, or an MLX server keeps every token on your machine; your own OpenAI, Anthropic, or OpenRouter key gives the sharpest synthesis. Start local and rebuild under a stronger model later, since your raw material is kept. |
+| **Surfaces** | The built-in Telegram adapter, plus whatever channels your host provides. Hermes, for example, reaches Telegram, Discord, Slack, WhatsApp, Signal, email, and the CLI. It is the same persona everywhere. |
+| **Tools** | Web search, page fetch, your host's skills, and voice are built in. Bring your own with one extension file (`ALTER_TOOLS_EXTENSION`), so tools that only make sense on your machine never have to live in this repo. |
+| **Your data** | The persona corpus lives in your local database. Nothing about you goes to a service the author runs, because there is no such service. |
 
 > [!NOTE]
 > Where your data goes depends on the model you pick. A local model keeps every token on your machine. A frontier model runs under your own API key and sends prompt content to that provider. Either way, your persona corpus stays in your local database.
@@ -58,10 +58,9 @@ The skill is one `SKILL.md` in the standard [agent skills](https://agentskills.i
 
 | Host | Command |
 | --- | --- |
-| Hermes | `hermes skills tap add alter-persona/alter` |
-| OpenClaw | `clawhub install alter` |
-| Claude Code, Codex, Cursor, and friends | `npx skills add alter-persona/alter` |
-| GitHub CLI | `gh skill install alter-persona/alter` |
+| Hermes | `hermes skills tap add alter-persona/alter` then `hermes skills install alter-persona/alter/alter` |
+| OpenClaw | `clawhub install @jasonquantum/alter` |
+| Claude Code, Codex, Cursor, and other coding agents | `npx skills add alter-persona/alter` or `gh skill install alter-persona/alter` |
 
 Hermes can also pull it straight from the well-known endpoint:
 
@@ -108,84 +107,39 @@ Voice is generated after the text reply has already been sent, so it never slows
 
 ---
 
-## Setup
+## Setup for the companion services
 
-### 1. Postgres
+The skill needs the local services running beside it: Postgres with pgvector, whisper.cpp, ffmpeg, and a model endpoint. The signed pack on the [Releases](https://github.com/alter-persona/alter/releases) page carries an installer that brings a clean machine to a passing health check.
 
 ```bash
-docker-compose up -d
+unzip alter-v0.2.0.zip && cd alter
+./bin/install.sh      # checks Node, ffmpeg, whisper.cpp; starts Postgres (Docker); asks your name and build model
+./bin/alter health    # every line should be a check mark
+./bin/alter status    # phase: interviewing, meter at 0%
 ```
 
-Starts Postgres 16 on `127.0.0.1:5433` (5433, not 5432, to avoid colliding
-with any existing local Postgres).
+To build the pack from a clone instead, run `bash pack/build-dist.sh <version>` and install from `dist/alter`.
 
-### 2. Environment
+The installer asks two questions: your name, and the build model. Press Enter for a local endpoint at `http://127.0.0.1:11434/v1` (fully offline, slightly rougher synthesis), or paste an API key for a frontier model. Either way you can change it later and run `./bin/alter rebuild`.
+
+Then talk to it. Set `TELEGRAM_PERSONA_BOT_TOKEN` in `services/.env` and start the adapter with `npm run loop:telegram` inside `services/`, or load `SKILL.md` into your skills host with one of the install lines above. The interview starts on your first message.
+
+Runtime model settings live in the same `.env`: `OLLAMA_URL` (any OpenAI-compatible server that also exposes the native `/api/chat` route, default `http://127.0.0.1:11434`) and `TALK_MODEL` for the reply model. See `pack/QUICKSTART.md` for the first three questions and `pack/PRIVACY.md` for what is stored where.
+
+### Optional: browser recording page
+
+The repo also contains the original browser intake page, a development convenience for recording answers with a microphone instead of chat. It is not needed for the in-chat product.
 
 ```bash
-cp .env.example .env
-```
-
-`DATABASE_URL` in the example already matches the docker-compose defaults.
-
-### 3. Database and questions
-
-```bash
+docker-compose up -d           # Postgres 16 + pgvector on 127.0.0.1:5433
+cp .env.example .env           # DATABASE_URL already matches
 npm install
 npx prisma migrate dev
-npm run db:seed
+npm run db:seed                # builds the four-module curriculum from src/curriculum/curriculum.ts
+npm run dev                    # http://localhost:3000
 ```
 
-The seed builds the four-module curriculum from `src/curriculum/curriculum.ts`:
-Identity and values, Communication situations, Work and craft, and Interests
-and passions. It interleaves the 20-item Mini-IPIP (Donnellan et al., 2006;
-public domain, ipip.ori.org) and places the eight sealed validation questions
-last. (`voice-personality-intake.md` is generated documentation, not an
-input.) Swapping in the 120-item IPIP-NEO later is a seed-only change: replace
-`LIKERT_ITEMS` in `prisma/seed.ts` and re-run.
-
-### 4. whisper.cpp (default transcriber)
-
-whisper.cpp is the fastest local option on Apple Silicon because it runs on
-Metal (and the Neural Engine via Core ML).
-
-```bash
-# Build with Metal (on by default on macOS) — Core ML optional but faster:
-git clone https://github.com/ggml-org/whisper.cpp
-cd whisper.cpp
-cmake -B build -DWHISPER_COREML=1
-cmake --build build -j --config Release
-
-# Download a model — large-v3-turbo recommended (or large-v3 for max accuracy):
-./models/download-ggml-model.sh large-v3-turbo
-```
-
-Then set in `.env`:
-
-```
-WHISPER_CLI_PATH=/path/to/whisper.cpp/build/bin/whisper-cli
-WHISPER_MODEL_PATH=/path/to/whisper.cpp/models/ggml-large-v3-turbo.bin
-```
-
-ffmpeg is required to convert browser webm/opus recordings to the 16 kHz WAV
-that whisper.cpp expects:
-
-```bash
-brew install ffmpeg
-```
-
-(If ffmpeg isn't on PATH, set `FFMPEG_PATH` in `.env`.)
-
-### 5. Run
-
-```bash
-npm run dev
-```
-
-Open http://localhost:3000, start a labelled session, and grant microphone
-access when prompted. Use Chrome for `audio/webm;codecs=opus` recording
-(Safari falls back to `audio/mp4`, which is also supported end to end).
-
----
+whisper.cpp is the default transcriber because it runs on Metal (and the Neural Engine via Core ML) on Apple Silicon. Build it from [ggml-org/whisper.cpp](https://github.com/ggml-org/whisper.cpp), download `large-v3-turbo`, and set `WHISPER_CLI_PATH` and `WHISPER_MODEL_PATH` in `.env`. ffmpeg converts browser recordings to the 16 kHz WAV whisper expects (`brew install ffmpeg`; set `FFMPEG_PATH` if it is not on PATH).
 
 ## Transcription providers
 
@@ -211,7 +165,7 @@ overwritten by the transcriber.
 
 ---
 
-## Durability and resume
+### Durability and resume (browser page)
 
 - Every answer is upserted on `(sessionId, questionId)` the moment it is
   saved. Re-answering updates in place, and a refresh or crash loses nothing.
@@ -224,7 +178,7 @@ overwritten by the transcriber.
 
 ---
 
-## Export
+### Export (browser page)
 
 From the session overview (or the home page): downloads a zip containing
 `manifest.json` plus every audio file. The manifest lists each question with
@@ -240,15 +194,17 @@ is the ideal range).
 ## Layout
 
 ```
-prisma/schema.prisma        Session / Question / Response
-prisma/seed.ts              Parses voice-personality-intake.md + Mini-IPIP
-src/lib/transcriber/        Pluggable transcription providers
-src/lib/transcriptionQueue.ts  Background worker (resumes on boot)
-src/app/                    Home, interview, API routes
-data/audio/{session}/{question}.webm   Recordings (path stored in DB)
+skills/alter/SKILL.md        The skill: behavior contract in the agent-skills layout
+pack/                        Installer, health check, CLI wrapper, docs set, pack build
+src/curriculum/              The interview question set (single source of truth)
+src/corpus/                  Redaction, chunking, dedup, chat-export and document loaders
+src/persona2/                Propositions, style fingerprint, exemplars, prompt, validation
+src/loop/                    Improvement loop, sessions, tools, extension point, Telegram adapter
+src/understudy/              CLI: bootstrap, status, rebuild, health, evaluate, delete-everything
+src/app/                     Browser intake page and playground (optional)
+prisma/                      Schema and migrations
+tests/                       Five suites: corpus, ingest, persona2, voice, loop
 ```
-
----
 
 ## Corpus pipeline (stage 2)
 
@@ -267,7 +223,7 @@ npm run test:corpus                     # parser/processing unit tests
 | Source | What goes in |
 | --- | --- |
 | `sources/interview/*.zip` | The intake exports. Edited transcripts are ground truth, and the 8 sealed validation questions go only to `holdout/validation.jsonl`. |
-| `sources/chat-export/*.zip` | Assistant data exports (Claude supported, provider interface ready for ChatGPT). Human messages only. |
+| `sources/chat-export/*.zip` | AI chat exports from Claude or OpenAI (ChatGPT). Only your own messages are kept; the assistant's side never enters the corpus. |
 | `sources/work/` | A drop folder (md/txt/pdf/docx/html/eml). Every file needs an entry in `sources/work/manifest.yaml` (label, domain, sensitivity), or the run fails and names the orphans. |
 
 Outputs: `corpus/private.jsonl` + `corpus/public.jsonl` (physically separate by

@@ -32,8 +32,8 @@ It finishes by running the health check. All green means go.
 
 ## 3. Answer your first three questions
 
-Talk to the skill through your agent client (or open the localhost page it
-prints). It will ask one question at a time — answer in a voice memo or text:
+Talk to the skill through your chat client or agent host. It will ask one
+question at a time — answer in a voice memo or text:
 
 1. *"Introduce yourself the way you would to someone interesting you just
    met…"* — 60-90 seconds is plenty.

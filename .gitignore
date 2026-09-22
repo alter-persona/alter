@@ -51,6 +51,7 @@ next-env.d.ts
 /CLAUDE.md
 /docs/*
 !/docs/push-audit.md
+!/docs/posts/
 /VERSIONS
 
 # ── OS noise ─────────────────────────────────────────────────
