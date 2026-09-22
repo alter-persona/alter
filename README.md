@@ -19,8 +19,7 @@ flowchart LR
     K -. corrections and new material .-> B
 ```
 
-<!-- For extra polish, add a short Telegram demo GIF above:
-     ![Alter in Telegram](docs/images/hero.gif) -->
+![The sample persona answering in the terminal](docs/images/hero.gif)
 
 ---
 
@@ -49,6 +48,20 @@ Alter ships as one `SKILL.md` in the standard [agent skills](https://agentskills
 
 > [!NOTE]
 > Where your data goes depends on the model you pick. A local model keeps every token on your machine. A frontier model runs under your own API key and sends prompt content to that provider. Either way, your persona corpus stays in your local database.
+
+---
+
+## Try it in five minutes
+
+The repo ships a synthetic persona, Maren Holt, a fictional retired lighthouse keeper who restores valve radios. She needs Node 20 and a model endpoint, nothing else: no database, no whisper, no interview.
+
+```bash
+git clone https://github.com/alter-persona/alter.git && cd alter
+npm install
+npm run demo -- --message "Someone offers you a smart doorbell for free. What do you do with it?"
+```
+
+That talks to any OpenAI-compatible endpoint, by default `http://127.0.0.1:11434/v1` (Ollama, LM Studio, and MLX servers all speak it) and the first model it lists. Pass `--url`, `--model`, and `--api-key` for a hosted model, or `--dry-run` to see the assembled prompt: her memory arrives as third-person archivist notes, her voice as a measured fingerprint plus a few short passages, and the two never mix. Run it with no `--message` for a conversation.
 
 ---
 
