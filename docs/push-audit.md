@@ -29,7 +29,7 @@ authored as `alter-persona <alter-persona@users.noreply.github.com>` and
 contains exactly the audited tree.
 
 **⚠ FLAGGED (open):** the remote holds creation-form commit `069283ef`
-("Initial commit", LICENSE only) authored **`JasonQuantum <j@jasonc.net>`** —
+("Initial commit", LICENSE only) authored under **the owner's personal GitHub identity and email** —
 the owner's real email, which is on this audit's flag list. It is already on
 GitHub in the owner's private repo, so pushing adds no new exposure *today*,
 but on the public flip at release it becomes permanently visible in history.
@@ -42,7 +42,7 @@ pending the owner's choice:**
   commit; replacing it is safe, and the result contains no personal email
   anywhere. (Force-push only after explicit approval, per the task rules.)
 - **Option B:** keep the merge as-is and accept the email in the creation
-  commit. Note the org/repo is owned by the JasonQuantum account regardless,
+  commit. Note the org/repo is owned by the owner's personal account regardless,
   so the *identity* link exists either way — Option B only additionally
   exposes the raw email address.
 
