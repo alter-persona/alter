@@ -23,6 +23,9 @@ import { prisma } from "@/lib/db";
  *   npm run understudy -- health        prove the companion services alive
  *   npm run understudy -- about        the three-sentence disclosure
  *   npm run understudy -- delete-everything --yes
+ *   npm run understudy -- demo [--message "…"] [--url …/v1] [--model …] [--api-key …] [--dry-run]
+ *       Talk to the synthetic sample persona (packs/sample/) with no
+ *       database, no whisper, and no interview: any OpenAI-compatible endpoint.
  */
 
 function arg(flag: string): string | undefined {
@@ -446,8 +449,14 @@ async function main(): Promise<void> {
       break;
     }
     case "delete-everything": await deleteEverything(); break;
+    case "demo": {
+      // No database: the sample persona answers from files on disk.
+      const { runDemoCli } = await import("./demo");
+      await runDemoCli(process.argv.slice(3));
+      return;
+    }
     default:
-      console.log("usage: understudy export|bootstrap|status|rebuild|health|about|delete-everything");
+      console.log("usage: understudy export|bootstrap|status|rebuild|health|about|demo|delete-everything");
       process.exit(1);
   }
   await prisma.$disconnect();

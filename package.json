@@ -1,6 +1,6 @@
 {
   "name": "vibepersonality",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -24,7 +24,9 @@
     "test:loop": "tsx --test tests/loop/*.test.ts",
     "curriculum": "tsx src/curriculum/cli.ts",
     "understudy": "tsx src/understudy/cli.ts",
-    "alter": "tsx src/understudy/cli.ts"
+    "alter": "tsx src/understudy/cli.ts",
+    "demo": "tsx src/understudy/cli.ts demo",
+    "test:tools": "tsx --test tests/loop/tools.test.ts tests/loop/llm.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

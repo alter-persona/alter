@@ -21,7 +21,7 @@ next-env.d.ts
 /eval/
 /backups/
 /logs/
-/packs/
+/packs/*
 !/packs/sample/
 
 # ── Voice: recordings, datasets, models (personal audio) ─────
@@ -56,3 +56,4 @@ next-env.d.ts
 
 # ── OS noise ─────────────────────────────────────────────────
 .DS_Store
+!/docs/images/

@@ -30,6 +30,9 @@ rsync -a "$REPO/" "$OUT/services/" \
   --exclude voice-personality-intake.md --exclude README.md \
   --exclude "src/corpus/persona" --exclude "src/skill"
 
+# The synthetic sample persona ships so a stranger gets a reply with no DB.
+mkdir -p "$OUT/services/packs" && cp -R "$REPO/packs/sample" "$OUT/services/packs/sample"
+
 # Strip legacy v1 script entries whose sources are excluded.
 node -e '
 const fs = require("fs");
