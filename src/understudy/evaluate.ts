@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { prisma } from "@/lib/db";
-import { runChatTurn } from "@/loop/runtime";
-import { improvementLlm, parseJson } from "@/loop/llm";
+import { runChatTurn, type ChatTurnInput } from "@/loop/runtime";
+import { improvementLlm, parseJson, type LoopLlm } from "@/loop/llm";
 
 /**
  * Evaluation battery — written into the test, not left to vibes.
@@ -20,10 +20,20 @@ import { improvementLlm, parseJson } from "@/loop/llm";
  * Output under eval/.
  */
 
-const EVAL_DIR = () => path.join(process.cwd(), "eval");
+const EVAL_DIR = (override?: string) => override ?? process.env.ALTER_EVAL_DIR ?? path.join(process.cwd(), "eval");
 
-async function personaAnswer(personaId: string, personaName: string, q: string): Promise<string> {
+/** Hooks for tests and for judging under a different model than the runtime:
+ * generate replaces the persona's generation call, judge replaces the
+ * agreement judge, evalDir redirects the output folder. */
+export interface EvalOptions {
+  generate?: ChatTurnInput["generate"];
+  judge?: LoopLlm;
+  evalDir?: string;
+}
+
+async function personaAnswer(personaId: string, personaName: string, q: string, generate?: ChatTurnInput["generate"]): Promise<string> {
   const turn = await runChatTurn({
+    generate,
     personaId,
     personaName,
     channel: "playground",
@@ -52,7 +62,8 @@ export interface SealedEvalResult {
   gaps: string[]; // one-line rationales where the persona DIFFERS
 }
 
-export async function evalSealed(personaId: string, personaName: string): Promise<SealedEvalResult> {
+export async function evalSealed(personaId: string, personaName: string, opts: EvalOptions = {}): Promise<SealedEvalResult> {
+  const judge = opts.judge ?? improvementLlm();
   const sealed = await prisma.question.findMany({
     where: { isValidation: true },
     orderBy: { orderIndex: "asc" },
@@ -61,16 +72,18 @@ export async function evalSealed(personaId: string, personaName: string): Promis
   for (const q of sealed) {
     const real = (
       await prisma.response.findFirst({
-        where: { questionId: q.id, transcript: { not: null } },
+        // The real answer must be THIS persona's own; on a machine with several
+        // personas the most recent transcript could belong to someone else.
+        where: { questionId: q.id, transcript: { not: null }, session: { personaId } },
         orderBy: { createdAt: "desc" },
       })
     )?.transcript;
     if (!real) continue;
-    const persona = await personaAnswer(personaId, personaName, q.promptText);
+    const persona = await personaAnswer(personaId, personaName, q.promptText, opts.generate);
     let agrees: boolean | null = null;
     let rationale = "";
     try {
-      const raw = await improvementLlm()(
+      const raw = await judge(
         AGREEMENT_SYSTEM,
         `Question: ${q.promptText}\n\nAnswer A (the real person, spoken):\n"""${real.slice(0, 1500)}"""\n\nAnswer B (persona):\n"""${persona.slice(0, 1500)}"""`
       );
@@ -83,7 +96,7 @@ export async function evalSealed(personaId: string, personaName: string): Promis
     rows.push({ q: q.promptText, real, persona, agrees, rationale });
   }
 
-  fs.mkdirSync(EVAL_DIR(), { recursive: true });
+  fs.mkdirSync(EVAL_DIR(opts.evalDir), { recursive: true });
 
   // Blind discrimination sheet: A/B shuffled per item; key kept separate.
   const key: string[] = [];
@@ -96,10 +109,10 @@ export async function evalSealed(personaId: string, personaName: string): Promis
     })
     .join("\n---\n\n");
   fs.writeFileSync(
-    path.join(EVAL_DIR(), "blind-sheet.md"),
+    path.join(EVAL_DIR(opts.evalDir), "blind-sheet.md"),
     `# Blind discrimination sheet — ${new Date().toISOString().slice(0, 10)}\nLabel each item, THEN open blind-sheet-key.md. Near-50% accuracy means the persona is indistinguishable.\n\n${sheet}`
   );
-  fs.writeFileSync(path.join(EVAL_DIR(), "blind-sheet-key.md"), key.join("\n") + "\n");
+  fs.writeFileSync(path.join(EVAL_DIR(opts.evalDir), "blind-sheet-key.md"), key.join("\n") + "\n");
 
   const agreed = rows.filter((r) => r.agrees === true).length;
   const judged = rows.filter((r) => r.agrees !== null).length;
@@ -113,7 +126,7 @@ export async function evalSealed(personaId: string, personaName: string): Promis
         `## ${i + 1}. ${r.q}\n- agreement: **${r.agrees === null ? "unjudged" : r.agrees ? "AGREES" : "DIFFERS"}** — ${r.rationale}\n- real: ${r.real.slice(0, 300)}…\n- persona: ${r.persona.slice(0, 300)}…\n`
     ),
   ].join("\n");
-  const p = path.join(EVAL_DIR(), "sealed-report.md");
+  const p = path.join(EVAL_DIR(opts.evalDir), "sealed-report.md");
   fs.writeFileSync(p, report);
   return {
     path: p,
