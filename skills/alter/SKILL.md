@@ -10,7 +10,7 @@ description: Build and run a digital persona of the user, their alter ego. Inter
   something drafted the way they would write it.
 license: Apache-2.0
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   author: alter-persona
   hermes:
     tags: [persona, digital-twin, personality, voice, writing, memory]
