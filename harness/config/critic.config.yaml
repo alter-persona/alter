@@ -1,0 +1,20 @@
+# Merge into ~/.hermes/profiles/hustle-critic/config.yaml.
+# A different model from the Builder on purpose. Same-model review passes work it should bounce.
+model:
+  default: claude-sonnet-5
+  provider: anthropic
+
+terminal:
+  backend: local
+  cwd: /Users/hustle/project
+
+approvals:
+  mode: off
+  unattended_mode: approve
+  deny:
+    - "git push*"        # the Critic reads and runs tests; it never pushes
+    - "rm -rf*"
+    - "sudo*"
+
+kanban:
+  notify_in_gateway: false

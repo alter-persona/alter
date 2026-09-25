@@ -1,0 +1,19 @@
+# Merge into ~/.hermes/profiles/hustle-driver/config.yaml.
+# Orchestrator lane: board, files and web, no terminal. It plans; it cannot wander off and build.
+model:
+  default: local-large:latest
+  provider: openai-compatible
+  base_url: http://127.0.0.1:11434/v1
+
+toolsets:
+  - kanban
+  - file
+  - web
+
+approvals:
+  mode: off
+  cron_mode: approve
+
+kanban:
+  orchestrator_profile: hustle-driver
+  notify_in_gateway: false
