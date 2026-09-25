@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <!-- Serves ~/project/status on http://127.0.0.1:8091 for the hustle user. install.sh substitutes HOME_DIR and loads it. -->
+  <!-- Serves the project's status folder on http://127.0.0.1:8091. install.sh substitutes PROJECT_DIR and loads it. -->
   <key>Label</key><string>ai.hustle.status</string>
   <key>ProgramArguments</key>
   <array>
