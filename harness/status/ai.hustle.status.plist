@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <!-- Serves ~/project/status on http://127.0.0.1:8091 for the hustle user. install.sh substitutes HOME_DIR and loads it. -->
+  <!-- Serves the project's status folder on http://127.0.0.1:8091. install.sh substitutes PROJECT_DIR and loads it. -->
   <key>Label</key><string>ai.hustle.status</string>
   <key>ProgramArguments</key>
   <array>
@@ -10,11 +10,11 @@
     <string>-m</string><string>http.server</string>
     <string>8091</string>
     <string>--bind</string><string>127.0.0.1</string>
-    <string>--directory</string><string>HOME_DIR/project/status</string>
+    <string>--directory</string><string>PROJECT_DIR/status</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>HOME_DIR/project/status/serve.log</string>
-  <key>StandardErrorPath</key><string>HOME_DIR/project/status/serve.log</string>
+  <key>StandardOutPath</key><string>PROJECT_DIR/status/serve.log</string>
+  <key>StandardErrorPath</key><string>PROJECT_DIR/status/serve.log</string>
 </dict>
 </plist>

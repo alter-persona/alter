@@ -8,16 +8,24 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PROJECT="${HUSTLE_PROJECT:-$HOME/project}"
 
+# The shipped files name /Users/hustle/project; localize() rewrites that to this install's folder,
+# so the harness also runs under another user or path.
+localize() { sed "s#/Users/hustle/project#$PROJECT#g" "$1" > "$2"; }
+
 echo "1/6 project folder"
 mkdir -p "$PROJECT"/{research,site,services,marketing,emails,reports,evidence}
 cp -n "$HERE/CHARTER.md" "$PROJECT/CHARTER.md"
 cp -n "$HERE/RUBRIC.md" "$PROJECT/RUBRIC.md"
 touch "$PROJECT/LEDGER.md" "$PROJECT/DECISIONS.md"
 mkdir -p "$PROJECT/harness/status" "$PROJECT/status"
-cp "$HERE/watchdog.sh" "$HERE/driver-tick.sh" "$PROJECT/harness/"
+localize "$HERE/watchdog.sh" "$PROJECT/harness/watchdog.sh"
+localize "$HERE/driver-tick.sh" "$PROJECT/harness/driver-tick.sh"
 cp "$HERE/status/render.py" "$HERE/status/render.sh" "$HERE/status/record-review.sh" "$PROJECT/harness/status/"
 chmod +x "$PROJECT/harness/watchdog.sh" "$PROJECT/harness/driver-tick.sh" "$PROJECT/harness/status/"*.sh
-if [ ! -d "$PROJECT/.git" ]; then (cd "$PROJECT" && git init -q && git add -A && git commit -qm "harness: initial charter and rubric"); fi
+if [ ! -d "$PROJECT/.git" ]; then
+  (cd "$PROJECT" && git init -q && git config user.name "hustle" && git config user.email "hustle@localhost" \
+    && git add -A && git commit -qm "harness: initial charter and rubric")
+fi
 
 echo "2/6 profiles"
 for p in driver builder critic reporter; do
@@ -40,10 +48,12 @@ def walk(node, prefix=""):
 walk(yaml.safe_load(open(path)))
 PY
 }
-apply hustle-driver   "$HERE/config/driver.config.yaml"
-apply hustle-builder  "$HERE/config/builder.config.yaml"
-apply hustle-critic   "$HERE/config/critic.config.yaml"
-apply hustle-reporter "$HERE/config/reporter.config.yaml"
+TMPCFG="$(mktemp -d)"
+for p in driver builder critic reporter; do
+  localize "$HERE/config/$p.config.yaml" "$TMPCFG/$p.yaml"
+  apply "hustle-$p" "$TMPCFG/$p.yaml"
+done
+rm -rf "$TMPCFG"
 
 echo "4/6 write fence"
 grep -q HERMES_WRITE_SAFE_ROOT "$HOME/.hermes/.env" 2>/dev/null || echo "HERMES_WRITE_SAFE_ROOT=$PROJECT:$HOME/.hermes" >> "$HOME/.hermes/.env"
@@ -52,7 +62,7 @@ echo "5/6 skills and board"
 for s in hustle-driver hustle-critic hustle-digest; do
   for p in driver critic reporter; do
     mkdir -p "$HOME/.hermes/profiles/hustle-$p/skills/$s"
-    cp "$HERE/skills/$s/SKILL.md" "$HOME/.hermes/profiles/hustle-$p/skills/$s/SKILL.md"
+    localize "$HERE/skills/$s/SKILL.md" "$HOME/.hermes/profiles/hustle-$p/skills/$s/SKILL.md"
   done
 done
 hermes kanban init >/dev/null 2>&1 || true
@@ -72,7 +82,7 @@ echo "7/7 status page on http://127.0.0.1:8091"
 python3 "$PROJECT/harness/status/render.py" "$PROJECT" || true
 PLIST="$HOME/Library/LaunchAgents/ai.hustle.status.plist"
 mkdir -p "$HOME/Library/LaunchAgents"
-sed "s#HOME_DIR#$HOME#g" "$HERE/status/ai.hustle.status.plist" > "$PLIST"
+sed "s#PROJECT_DIR#$PROJECT#g" "$HERE/status/ai.hustle.status.plist" > "$PLIST"
 launchctl unload "$PLIST" 2>/dev/null || true
 launchctl load "$PLIST" 2>/dev/null || echo "launchctl load failed; start by hand: python3 -m http.server 8091 --bind 127.0.0.1 --directory $PROJECT/status"
 
