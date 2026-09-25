@@ -13,9 +13,10 @@ mkdir -p "$PROJECT"/{research,site,services,marketing,emails,reports,evidence}
 cp -n "$HERE/CHARTER.md" "$PROJECT/CHARTER.md"
 cp -n "$HERE/RUBRIC.md" "$PROJECT/RUBRIC.md"
 touch "$PROJECT/LEDGER.md" "$PROJECT/DECISIONS.md"
-mkdir -p "$PROJECT/harness"
+mkdir -p "$PROJECT/harness/status" "$PROJECT/status"
 cp "$HERE/watchdog.sh" "$HERE/driver-tick.sh" "$PROJECT/harness/"
-chmod +x "$PROJECT/harness/watchdog.sh" "$PROJECT/harness/driver-tick.sh"
+cp "$HERE/status/render.py" "$HERE/status/render.sh" "$HERE/status/record-review.sh" "$PROJECT/harness/status/"
+chmod +x "$PROJECT/harness/watchdog.sh" "$PROJECT/harness/driver-tick.sh" "$PROJECT/harness/status/"*.sh
 if [ ! -d "$PROJECT/.git" ]; then (cd "$PROJECT" && git init -q && git add -A && git commit -qm "harness: initial charter and rubric"); fi
 
 echo "2/6 profiles"
@@ -64,12 +65,24 @@ hermes -p hustle-reporter cron create "daily at 7:45am" "Compose and send the da
   --name "hustle-digest" --skill hustle-digest --deliver telegram || true
 hermes -p hustle-reporter cron create "every 30m" --no-agent --script "$PROJECT/harness/watchdog.sh" \
   --deliver telegram --name "hustle-watchdog" || true
+hermes -p hustle-reporter cron create "every 5m" --no-agent --script "$PROJECT/harness/status/render.sh" \
+  --deliver local --name "hustle-status-render" || true
+
+echo "7/7 status page on http://127.0.0.1:8091"
+python3 "$PROJECT/harness/status/render.py" "$PROJECT" || true
+PLIST="$HOME/Library/LaunchAgents/ai.hustle.status.plist"
+mkdir -p "$HOME/Library/LaunchAgents"
+sed "s#HOME_DIR#$HOME#g" "$HERE/status/ai.hustle.status.plist" > "$PLIST"
+launchctl unload "$PLIST" 2>/dev/null || true
+launchctl load "$PLIST" 2>/dev/null || echo "launchctl load failed; start by hand: python3 -m http.server 8091 --bind 127.0.0.1 --directory $PROJECT/status"
 
 cat <<EOF
 
 Done. Next:
-  1. Paste the idea into $PROJECT/CHARTER.md under Goal, and check the spend cap and launch gate.
+  1. Check $PROJECT/CHARTER.md: the products page URL, the spend cap and the launch gate.
   2. hermes -p hustle-reporter gateway start      # Telegram plus the board dispatcher
   3. $PROJECT/harness/driver-tick.sh               # first tick now instead of in 30 minutes
-  4. hermes kanban watch                            # optional: watch the board live
+  4. open http://127.0.0.1:8091                    # the status page; hermes kanban watch for a live stream
+To show the page at http://localhost:8090/status instead, point the 8090 server at $PROJECT/status
+(a symlink works if it serves a static directory).
 EOF

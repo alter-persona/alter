@@ -75,6 +75,15 @@ The rule is that the agent never waits and never narrates. Concretely:
 - Two exceptions can send an out-of-band message, and only once each per 24 hours: spend above the cap in the charter, or a credential the Builder cannot get. Everything else waits for the digest.
 - You steer by replying to the digest. The reporter profile runs the Telegram gateway and turns your reply into a top-priority card tagged `owner-override`. The Driver reads those first.
 
+## Watching it
+
+Four surfaces, from least to most detail:
+
+- The daily Telegram digest at 07:45, the only push you get.
+- The status page at `http://127.0.0.1:8091` on the Mac Studio, rendered every five minutes by a no-agent cron from the board, the Critic's verdict log, the ledger and the decisions file, and refreshing itself every minute. It shows the metrics tiles, the board by column, the last 30 Critic verdicts with their numbered findings, and the ledger and decisions tails. The Critic appends every verdict to `status/reviews.jsonl` through `record-review.sh`, so bounce reasons are visible without opening the board. To serve it from the products site instead, point the 8090 server at `~/project/status`; a symlink works if that server serves a static directory.
+- The Hermes dashboard, `hermes dashboard`, at `http://127.0.0.1:9119`, for sessions, cron runs and the kanban plugin with live events.
+- `hermes kanban watch` in a terminal for the raw event stream.
+
 ## Metrics that show it is working
 
 All counts come from the board's event log, which `hermes kanban list --json` and `hermes kanban watch` expose. The watchdog script computes them.
@@ -115,6 +124,7 @@ Day five onward. Demand data exists. The Driver starts build cards. You receive 
 | `config/*.config.yaml` | Per-profile Hermes settings: models, toolsets, approvals, deny globs, board dispatch. |
 | `skills/*/SKILL.md` | The tick, review and digest procedures as Hermes skills. |
 | `driver-tick.sh`, `watchdog.sh` | The two no-agent cron scripts. |
+| `status/` | The status page: `render.py` builds `~/project/status/index.html`, `record-review.sh` logs Critic verdicts, and the launchd plist serves the folder on port 8091. |
 | `install.sh` | Creates the folder, profiles, config, skills, board and cron jobs. |
 
 ## Questions for you before night one
