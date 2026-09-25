@@ -11,4 +11,5 @@ metadata:
 2. Open `/Users/hustle/project/RUBRIC.md`. Use the type table and the common table.
 3. For each required row, run the check. Commands go through the terminal tool from the project folder. A URL check is `curl -sS -o /dev/null -w "%{http_code}" <url>`. A commit check is `git show <hash> --stat`.
 4. Decide. All required rows pass: `kanban_complete(summary="<two lines: what shipped, which metric it moved>")`. Any row fails: `kanban_request_changes("<numbered failing rows, each with what would make it pass>")`.
-5. Count passes of this type in `LEDGER.md`. On the tenth, append a stricter row to the type table, commit `RUBRIC.md`, and write a dated line to `DECISIONS.md`.
+5. Record the verdict so it shows on the status page at `http://127.0.0.1:8091`: from `/Users/hustle/project` run `harness/status/record-review.sh <card id> <type> <pass|changes> "<card title>" "<numbered findings, one per line; empty on a pass>"`.
+6. Count passes of this type in `LEDGER.md`. On the tenth, append a stricter row to the type table, commit `RUBRIC.md`, and write a dated line to `DECISIONS.md`.
