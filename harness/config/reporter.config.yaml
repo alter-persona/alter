@@ -1,0 +1,30 @@
+# Merge into ~/.hermes/profiles/hustle-reporter/config.yaml.
+# This profile owns the Telegram gateway and the board dispatcher. Its .env holds the bot token:
+#   TELEGRAM_BOT_TOKEN=...
+#   TELEGRAM_ALLOWED_USERS=<your telegram user id>
+model:
+  default: local-large:latest
+  provider: openai-compatible
+  base_url: http://127.0.0.1:11434/v1
+
+toolsets:
+  - kanban
+  - file
+
+kanban:
+  dispatch_in_gateway: true
+  dispatch_interval_seconds: 60
+  dispatch_stale_timeout_seconds: 14400
+  failure_limit: 2
+  max_in_progress: 2
+  max_in_progress_per_profile: 1
+  auto_decompose: false        # the Driver decomposes; the LLM decomposer would compete with it
+  review_dispatch: true
+  default_workdir: dir:/Users/hustle/project
+  notify_in_gateway: false
+  orchestrator_profile: hustle-driver
+
+cron:
+  wrap_response: false
+  delivery:
+    notify: true

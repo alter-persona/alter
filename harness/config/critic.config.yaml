@@ -1,0 +1,26 @@
+# Merge into ~/.hermes/profiles/hustle-critic/config.yaml.
+# Local, like every other profile: this project is also a test of the local model. Same-model review is
+# softer than cross-model review, so the rubric makes the Critic run commands rather than read prose,
+# and the bounce rate in the digest is the signal. If it sits under 20 percent for two days, the cheapest
+# fix is a second local model here (a different family, not a different quant of the same one).
+# A frontier model is possible by changing these three lines, and is the owner's call, never the agent's.
+model:
+  default: local-large:latest
+  provider: openai-compatible
+  base_url: http://127.0.0.1:11434/v1
+  temperature: 0
+
+terminal:
+  backend: local
+  cwd: /Users/hustle/project
+
+approvals:
+  mode: off
+  unattended_mode: approve
+  deny:
+    - "git push*"        # the Critic reads and runs tests; it never pushes
+    - "rm -rf*"
+    - "sudo*"
+
+kanban:
+  notify_in_gateway: false
