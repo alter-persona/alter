@@ -25,18 +25,33 @@ Driver. An orchestrator-lane profile whose toolset has the board, file reads and
 
 Builder. A worker-lane profile with the full toolset, `--yolo`, and writes fenced to the project folder. The dispatcher spawns it when a card reaches `ready`. It reads the card, does the work, commits to git, and calls `kanban_request_review` with an evidence block: commands run, their output, URLs, screenshots, numbers. Work without evidence goes back.
 
-Critic. A reviewer-lane profile on a different model from the Builder. Same-model review is soft review. It loads the rubric, checks the evidence, and calls `kanban_complete` or `kanban_request_changes` with a numbered list of what is missing. It never fixes the work itself. The bounce rate is a health metric, not a failure: below 20 percent the Critic is rubber-stamping, above 60 percent the Driver is writing bad cards.
+Critic. A reviewer-lane profile that loads the rubric, checks the evidence, and calls `kanban_complete` or `kanban_request_changes` with a numbered list of what is missing. It never fixes the work itself. The bounce rate is a health metric, not a failure: below 20 percent the Critic is rubber-stamping, above 60 percent the Driver is writing bad cards.
 
-The repo already runs this split: local model for runtime, frontier model for judgment (`config/improvement.json`). The harness reuses it. Builder on the local MLX model at zero marginal cost, Critic on Claude Sonnet under your key, Driver on the local model with a Sonnet fallback if its cards get bounced twice in a row.
+## Everything runs on the local model
+
+All four profiles point at the local model server on the Mac Studio at `http://127.0.0.1:11434/v1`, the same endpoint the repo's own loop uses. No frontier model is called. That is deliberate: this project is as much a test of the large local model under sustained, board-driven pressure as it is a product, and the ledger records how the model behaves (bounces by card type, cards needing a second attempt, cards the Driver had to split). The known cost is that same-model review is softer than cross-model review. The rubric compensates by making the Critic run commands and open URLs rather than read prose, and the digest's bounce rate is the early warning. If it sits under 20 percent for two days, the cheapest fix is a second local model of a different family for the Critic. A frontier Critic stays a three-line config change that only you make.
+
+The separate `hustle` macOS user reaches the model server over the loopback port, so nothing about the model setup changes.
+
+## The product the harness builds
+
+The product specification lives at `http://localhost:8090/products`, the output of the idea-generation agent. The Driver fetches it at the start of every tick, snapshots it to `research/product-source.md` on the first card, and diffs the live page against the snapshot on every later tick so an edit to the page reshapes the plan within 30 minutes. If the page is down, the snapshot stands in.
+
+The thesis on that page has three pillars and every card is labelled with the one it serves:
+
+1. Integrations. The product's value is the number of backend systems it can connect to and follow up from. A gym runs a membership platform, a beautician a booking app, a tradesperson a calendar and an invoicing tool. For each vertical the agent catalogues the top systems, their connection method (API, OAuth, CSV export, email parsing, calendar feed), the data available, and what follow-up that data makes possible. Then it builds connectors against sandboxes or recorded fixtures, with tests. Every third card the Driver writes is an integration card until the catalogue reaches twelve verticals, and the launch gate needs eight catalogued verticals and three working connectors.
+2. Lead generation for the product, without cold email as a source.
+3. Build and sell: connectors, ingestion, tests, the pricing model, the pilot offer, and the pitch that convinces an owner to connect one system for a two-week test and pay after week one.
 
 ## What the Driver pushes through, and in what order
 
-The charter fixes the goal and the launch gate. The Driver owns the sequencing, and the sequence is ordered by what kills the product soonest. Reaching the market is the hard part, so demand evidence comes before code.
+The charter fixes the goal and the launch gate. The Driver owns the sequencing, and the sequence is ordered by what kills the product soonest. Reaching the market is the hard part, so demand evidence comes before code, and integration work runs alongside everything else from day one.
 
-1. Discover. Name the beachhead segment inside the large market, the buyer, the trigger moment, the three competing alternatives, the pricing hypothesis, and the message in one sentence. Output: `research/positioning.md` with sources.
-2. Prove demand without cold email. Ship a landing page on a free host with a waitlist. Run at least five distribution experiments in parallel and score each on time-to-signal, signups per hour of effort, and cost. Candidates the Driver must test before it can skip them: programmatic SEO pages per use case, a free tool that is itself useful (tool-led growth), listings in the ecosystems the product plugs into (skill hubs, MCP registries, integration marketplaces), community answers where the buyer already asks the question (Reddit, Hacker News, Discords), comparison pages against the named alternatives, an open-source top of funnel, short video scripts, and partner or affiliate offers. Email is allowed only as the follow-up to a signup, never as the source of one.
-3. Build. Services, connectors, ingestion, tests for the ingestion, a security pass, and hosting on free tiers. The Driver may not let this phase run more than three days without a demand-side card closing in the same window.
-4. Launch readiness. Onboarding email sequence in Brevo (300 sends a day on the free plan, per Brevo's plan page), analytics, support path, launch checklist, and a launch brief for you. The launch itself is the one human gate.
+1. Discover. Name the beachhead segment inside the large market, the buyer, the trigger moment, the three competing alternatives, the pricing hypothesis, and the message in one sentence, and start the integration catalogue with four verticals. Output: `research/positioning.md` and `research/integrations.md` with sources.
+2. Prove demand without cold email. Ship a landing page on a free host with a waitlist. Run at least five distribution experiments in parallel and score each on time-to-signal, signups per hour of effort, and cost. Candidates the Driver must test before it can skip them: programmatic SEO pages per vertical and per system ("follow-up for Mindbody gyms"), a free tool that is itself useful (tool-led growth), listings in the marketplaces of the systems the product connects to, community answers where the buyer already asks the question, comparison pages against the named alternatives, an open-source top of funnel, short video scripts, and partner or affiliate offers. Email is allowed only as the follow-up to a signup, never as the source of one.
+3. Integrate. One connector per system, each passing the connector rubric: catalogued, connects, maps into the follow-up data model, proves one follow-up, fails well, disconnects cleanly. This phase never pauses until the catalogue is full.
+4. Build. Services, ingestion, tests for the ingestion, a security pass, and hosting on free tiers. The Driver may not let this phase run more than three days without a demand-side card closing in the same window.
+5. Launch readiness. Pricing and pilot offer in `research/pricing.md`, onboarding email sequence in Brevo (300 sends a day on the free plan, per Brevo's plan page), analytics, support path, launch checklist, and a launch brief for you. The launch itself is the one human gate.
 
 The Driver interleaves phases. It moves on when a phase's exit criterion in the charter is met, not when it feels done.
 
@@ -72,12 +87,15 @@ All counts come from the board's event log, which `hermes kanban list --json` an
 | Owner messages per day | Telegram sends by the reporter profile | 1, plus at most 2 exceptions |
 | Demand signal | Waitlist signups per week, from the landing page's store | Rising, and it must exist by day 3 |
 | Channel experiments scored | Rows in `research/channels.md` with a signups-per-hour figure | 5 or more by day 5 |
+| Verticals catalogued | Rows in `research/integrations.md` with all fields filled | 4 by day 2, 8 by day 6, 12 before launch |
+| Connectors passing | Cards of type connector in `done` | 1 by day 4, 3 before launch |
+| Model note | Bounces since last tick by card type, from the ledger line | Connector and code bounces trending down week on week |
 
 The watchdog runs as a no-agent cron every 30 minutes and only speaks when hours-since-last-done passes 6 or the dispatcher is not running.
 
 ## Hosting and cost
 
-The charter says as free as possible. The Builder's default stack for anything public: Cloudflare Pages for the site (unmetered static, 500 builds a month), Workers for the API (100,000 requests a day on the free plan), D1 for data (5 GB), and Brevo for transactional and onboarding email (300 a day). GitHub holds the code. The one predictable spend is a domain. The Critic's Sonnet calls are the only per-token cost, and the model runs only on review turns, which are short. Those free-tier figures come from the Cloudflare and Brevo pricing pages linked at the end of this document and should be rechecked on the day you provision.
+The charter says as free as possible. The Builder's default stack for anything public: Cloudflare Pages for the site (unmetered static, 500 builds a month), Workers for the API (100,000 requests a day on the free plan), D1 for data (5 GB), and Brevo for transactional and onboarding email (300 a day). GitHub holds the code. The one predictable spend is a domain. There is no per-token cost, because every profile runs on the local model. Those free-tier figures come from the Cloudflare and Brevo pricing pages linked at the end of this document and should be rechecked on the day you provision.
 
 ## Rollout
 
@@ -101,16 +119,16 @@ Day five onward. Demand data exists. The Driver starts build cards. You receive 
 
 ## Questions for you before night one
 
-- The meta idea is not in this repo. Paste it into `harness/CHARTER.md` under Goal, or send it and I will write the charter with exit criteria.
+- The charter now points at `http://localhost:8090/products` as the specification. Check that page is served for the `hustle` user too (it is a loopback port, so it should be) and that it stays up while the harness runs.
 - Which accounts can the agent hold? Cloudflare, GitHub, Brevo, a domain registrar, and one social account at minimum. Creating them under a `hustle@` alias before the start removes the single biggest source of blocked cards.
 - Spend cap. The charter defaults to 50 USD total without asking. Change it if you want more or zero.
-- Critic model. I recommend Claude Sonnet under your existing key. A local critic reviewing a local builder will pass work it should bounce.
-- Launch gate. The charter defines it as: live site, working signup, onboarding sequence sending, ingestion tests green, security checklist done, and a written launch brief. If launch means something else to you, change the gate.
+- Critic model. Everything is local by your instruction. If the bounce rate shows the Critic going soft, the first fix is a second local model of a different family, and a frontier Critic stays your call.
+- Launch gate. The charter defines it as: live site, working signup, onboarding sequence sending, eight catalogued verticals, three working connectors, ingestion tests green, security checklist done, pricing and pilot offer written, and a launch brief. If launch means something else to you, change the gate.
 
 ## What I am not sure about
 
 - Every Hermes command and config key in this design comes from the current docs (v0.14, May 2026). Run `hermes update` and `hermes doctor` on the Mac Studio first, and expect a flag or two to have moved.
-- The local model has not run this loop for days at a stretch. The Critic on a frontier model is the guard, and the bounce rate is the early warning. If it climbs past 60 percent for a day, move the Driver to Sonnet as well.
+- The local model has not run this loop for days at a stretch. The bounce rate is the early warning in both directions: under 20 percent means a soft Critic, over 60 percent means the Driver is writing cards the Builder cannot land. Both are findings about the model and go in the ledger.
 - Whether the Driver picks good beachheads depends on the charter's constraints. A vague charter gives a vague plan. Spend the hour on it.
 
 ## Sources

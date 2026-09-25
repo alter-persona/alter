@@ -17,5 +17,7 @@ You build one card at a time inside the project folder. The dispatcher started y
 - Never send email to anyone who did not sign up. Test sends go to the addresses in `.env` only.
 - Never store a credential in a file that is committed. Use environment variables.
 - Prefer free tiers and the smallest stack that works.
+- On a connector card, read the vendor's public API docs first and save the URLs in `research/integrations.md`. Use a public sandbox where one exists; otherwise record fixtures from the documented response shapes and say so on the card. Never sign up for a vendor account that asks for a card or a phone number; log the need in `DECISIONS.md` and build against fixtures.
+- Every connector maps into the same follow-up data model (customer, contact channel, last interaction, next follow-up) so the follow-up engine never cares which system the data came from.
 - When the Critic sends the card back, fix the numbered rows and nothing else, then re-request review.
 - Call `kanban_heartbeat` every 45 minutes on long jobs so the dispatcher does not reclaim your card.

@@ -40,6 +40,17 @@ The Critic scores every card in review against the section that matches the card
 | Secrets | Yes | No credential appears in the diff. `git diff <hash>~1 <hash> | grep -iE 'key|token|secret'` shows only variable names. |
 | Ingestion (if applicable) | Yes | A malformed input, an empty input and a duplicate input each have a test. |
 
+## Type: connector (one backend system)
+
+| Row | Required | Passes when |
+| --- | --- | --- |
+| Catalogued | Yes | `research/integrations.md` has the row: vertical, system, market share evidence, connection method, auth model, data available, rate limits, source URLs. |
+| Connects | Yes | The connector authenticates and reads real or sandbox data, and the evidence shows the call and its response with secrets redacted. If no sandbox exists, it runs against recorded fixtures and the card says so. |
+| Maps | Yes | Records land in the follow-up engine's data model (customer, contact channel, last interaction, next follow-up) and a test asserts the mapping. |
+| Follow-up proven | Yes | One follow-up is generated from connected data and shown in the evidence. |
+| Fails well | Yes | Tests cover expired auth, an empty account, a rate-limit response and a schema change. |
+| Reversible | Yes | Disconnecting removes the credential and stops the sync, and a test shows it. |
+
 ## Type: content (site copy, emails, campaign assets)
 
 | Row | Required | Passes when |

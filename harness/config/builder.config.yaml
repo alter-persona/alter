@@ -1,5 +1,5 @@
 # Merge into ~/.hermes/profiles/hustle-builder/config.yaml (install.sh applies these with `hermes config set`).
-# Model: the local MLX server. Keep the local model here; the Critic carries the frontier model.
+# Model: the local MLX server. Every profile in the harness uses it; no frontier model is called.
 model:
   default: local-large:latest
   provider: openai-compatible

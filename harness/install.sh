@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sets up the push harness on the Mac Studio. Run as the `hustle` macOS user, from a clone of this repo.
 # Prerequisites: Hermes installed for this user (`hermes doctor` passes), the local model server reachable,
-# and this user's ~/.hermes/.env holding ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN and the service tokens
+# and this user's ~/.hermes/.env holding TELEGRAM_BOT_TOKEN and the service tokens
 # named in harness/config/builder.config.yaml.
 set -euo pipefail
 
