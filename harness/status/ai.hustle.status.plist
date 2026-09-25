@@ -10,11 +10,11 @@
     <string>-m</string><string>http.server</string>
     <string>8091</string>
     <string>--bind</string><string>127.0.0.1</string>
-    <string>--directory</string><string>HOME_DIR/project/status</string>
+    <string>--directory</string><string>PROJECT_DIR/status</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>HOME_DIR/project/status/serve.log</string>
-  <key>StandardErrorPath</key><string>HOME_DIR/project/status/serve.log</string>
+  <key>StandardOutPath</key><string>PROJECT_DIR/status/serve.log</string>
+  <key>StandardErrorPath</key><string>PROJECT_DIR/status/serve.log</string>
 </dict>
 </plist>
